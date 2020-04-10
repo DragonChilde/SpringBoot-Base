@@ -1,19 +1,42 @@
 package com.springboot.config.springbootconfig.bean;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
+
+import javax.validation.constraints.Email;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 /**
- * @author Lee
- * @create 2020/3/30 15:50
+ * 将配置文件中配置的每一个属性的值，映射到这个组件中
+ * @ConfigurationProperties：告诉SpringBoot将本类中的所有属性和配置文件中相关的配置进行绑定；
+ *      prefix = "person"：配置文件中哪个下面的所有属性进行一一映射
+ *
+ * 只有这个组件是容器中的组件，才能容器提供的@ConfigurationProperties功能；
+ *  @ConfigurationProperties(prefix = "person")默认从全局配置文件中获取值；
+ *
  */
+@PropertySource(value = "classpath:person.properties")
+@Component
+@ConfigurationProperties(prefix = "person")
 public class Person {
+
+    @Email
+    //@Value("${person.name}")
     private String name;
+    //@Value("#{1+19}")   /*SPEL表达式*/
     private int age;
+
     private Boolean boss;
     private Date birth;
 
+   // @Value("${person.maps}")
     private Map<String,Object> maps;
     private List<Object> lists;
     private Dog dog;

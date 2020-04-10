@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.springboot.config.springbootconfig.SpringbootConfigApplicationTests
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.359 s - in com.springboot.config.springbootconfig.SpringbootConfigApplicationTests
