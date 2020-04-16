@@ -979,3 +979,87 @@ xxxxProperties:封装配置文件中相关属性；
 	DispatcherServletAutoConfiguration matched:
       - @ConditionalOnClass found required class 'org.springframework.web.servlet.DispatcherServlet' (OnClassCondition)
       - found 'session' scope (OnWebApplicationCondition)
+
+
+
+	Negative matches:（没有启动，没有匹配成功的自动配置类）
+
+  	ActiveMQAutoConfiguration:
+      Did not match:
+         - @ConditionalOnClass did not find required class 'javax.jms.ConnectionFactory' (OnClassCondition)
+
+	AopAutoConfiguration.AspectJAutoProxyingConfiguration:
+      Did not match:
+         - @ConditionalOnClass did not find required class 'org.aspectj.weaver.Advice' (OnClassCondition)
+
+
+# 日志 #
+
+## 日志框架 ##
+
+**市面上的日志框架**
+
+JUL、JCL、Jboss-logging、logback、log4j、log4j2、slf4j....
+
+<table>
+	<tr>
+		<td>日志门面  （日志的抽象层）</td>
+		<td>日志实现</td>
+	</tr>
+	<tr>
+		<td>JCL（Jakarta  Commons Logging）(不用)    SLF4j（Simple  Logging Facade for Java）    jboss-logging(不用)</td>
+		<td>Log4j  JUL（java.util.logging）  Log4j2  Logback</td>
+	</tr>
+</table>
+
+左边选一个门面（抽象层）、右边来选一个实现；
+
+日志门面：  SLF4J；
+
+日志实现：Logback；
+
+SpringBoot：底层是Spring框架，Spring框架默认是用JCL；
+
+​	**==SpringBoot选用 SLF4j和logback==**
+
+## SLF4j使用 ##
+
+### 如何在系统中使用SLF4j ###
+
+https://www.slf4j.org
+
+以后开发的时候，日志记录方法的调用，不应该来直接调用日志的实现类，而是调用日志抽象层里面的方法；
+
+给系统里面导入slf4j的jar和  logback的实现jar
+
+	import org.slf4j.Logger;
+	import org.slf4j.LoggerFactory;
+	
+	public class HelloWorld {
+	  public static void main(String[] args) {
+	    Logger logger = LoggerFactory.getLogger(HelloWorld.class);
+	    logger.info("Hello World");
+	  }
+	}
+
+![](http://120.77.237.175:9080/photos/springboot/25.png)
+
+每一个日志的实现框架都有自己的配置文件。使用slf4j以后，**配置文件还是做成日志实现框架自己本身的配置文件；**
+
+### 遗留问题 ###
+
+me（slf4j+logback）, Spring（commons-logging）,Hibernate（jboss-logging）,MyBatis、xxxx
+
+统一日志记录，即使是别的框架和我一起统一使用slf4j进行输出？
+
+![](http://120.77.237.175:9080/photos/springboot/26.png)
+
+
+**如何让系统中所有的日志都统一到slf4j；**
+
+1. 将系统中其他日志框架先排除出去；
+2. 用中间包来替换原有的日志框架；
+3. 我们导入slf4j其他的实现
+
+
+## SpringBoot日志关系 ##
