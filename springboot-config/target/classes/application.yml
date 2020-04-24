@@ -1,0 +1,19 @@
+#server:
+  #port: 8081
+spring:
+  profiles:
+    active: pro #启用名为pro的配置
+
+---
+
+server:
+  port: 8084
+spring:
+  profiles: pro
+
+---
+
+server:
+  port: 8085
+spring:
+  profiles: dev #指定属于哪个环境

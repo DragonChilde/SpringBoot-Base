@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!--引入thymeleaf标签-->
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>success</title>
+</head>
+<body>
+
+this is success page!
+<!--th:text 将p里面的文本内容设置为 -->
+<!--th:text进行了转义-->
+<p th:text="${hello}">欢迎</p>
+<!--th:utext不进行转义-->
+<p th:utext="${hello}">欢迎</p>
+
+<hr>
+<!--th:each会迭代当前的标签,因此要把迭代的内容标注在所需迭代的标签里-->
+<h1 th:text="${user}" th:each="user:${users}"></h1>
+<hr/>
+<ul>
+    <li th:each="user:${users}">[[${user}]]</li>
+</ul>
+</body>
+</html>
