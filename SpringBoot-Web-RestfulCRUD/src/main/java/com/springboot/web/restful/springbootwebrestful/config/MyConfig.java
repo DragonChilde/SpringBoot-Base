@@ -15,7 +15,9 @@ import org.springframework.web.servlet.config.annotation.*;
 @Configuration
 public class MyConfig implements WebMvcConfigurer {
 
-    String[] url = {"/","/index.html","/user/login"};
+
+    //定义不拦截路径,注意SpringBott2.0以上会把静态资源也拦截了,必须把静态webjars也排除
+    String[] url = {"/","/index","/index.html","/user/login","/asserts/**","/webjars/**"};
 
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
@@ -28,7 +30,9 @@ public class MyConfig implements WebMvcConfigurer {
     }
 
 
+    //注册拦截器
     public void addInterceptors(InterceptorRegistry registry) {
+        //添加不拦截的路径，SpringBoot已经做好了静态资源映射，所以我们不用管
         registry.addInterceptor(new LoginHandleInterceptor()).excludePathPatterns(url);
     }
 

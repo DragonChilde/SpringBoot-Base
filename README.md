@@ -2065,3 +2065,324 @@ template文件加不是静态资源文件夹，默认是无法直接访问的，
 
 
 2. 页面修改完成以后ctrl+f9：重新编译；
+
+登陆错误消息的显示
+
+	<p style="color: red" th:text="${msg}" th:if="${not #strings.isEmpty(msg)}" ></p>
+
+
+**Controller**
+
+	@Controller
+	public class LoginController {
+	
+	    @RequestMapping("/user/login")
+	    public String login(@RequestParam("username") String username, @RequestParam("password") String password, HttpSession session)
+	    {
+	        if(username.equals("admin") && password.equals("111111"))
+	        {
+	            session.setAttribute("user",username);
+	            return "redirect:/main.html";
+	        } else {
+	            session.setAttribute("msg","用户名或密码错误");
+	            return "redirect:/index.html";
+	        }
+	
+	    }
+	}
+
+#### 拦截器进行登陆检查 ####
+
+1. 实现拦截器
+
+		/*登录检查*/
+		public class LoginHandleInterceptor implements HandlerInterceptor {
+		
+		    //目标方法执行之前
+		    @Override
+		    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+		
+		        Object user = request.getSession().getAttribute("user");
+		        if(user == null)
+		        {
+		            //未登陆，返回登陆页面
+		            request.setAttribute("msg","没有权限登录!");
+		            request.getRequestDispatcher("/index.html").forward(request,response);
+		            return false;
+		        } else {
+		            //已登陆，放行请求
+		            return true;
+		        }
+		
+		    }
+		
+		    @Override
+		    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+		
+		    }
+		
+		    @Override
+		    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+		
+		    }
+		}
+
+2. 注册拦截器
+
+		@Configuration
+		public class MyConfig implements WebMvcConfigurer {
+		
+		    //定义不拦截路径(把静态资源的路径加入到不拦截的路径之中)
+		    String[] url = {"/","/index","/index.html","/user/login","/asserts/**","/webjars/**"};
+		
+		    @Override
+		    public void addViewControllers(ViewControllerRegistry registry) {
+		        // super.addViewControllers(registry);
+		        //浏览器发送 /atguigu 请求来到 success
+		        registry.addViewController("/").setViewName("login");
+		        registry.addViewController("index").setViewName("login");
+		        registry.addViewController("index.html").setViewName("login");
+		        registry.addViewController("main.html").setViewName("dashboard");
+		    }
+		
+		
+		    //注册拦截器
+		    public void addInterceptors(InterceptorRegistry registry) {
+		        //添加不拦截的路径，SpringBoot已经做好了静态资源映射，所以我们不用管
+		        registry.addInterceptor(new LoginHandleInterceptor()).excludePathPatterns(url);
+		    }
+		
+		    @Bean
+		    public LocaleResolver localeResolver()
+		    {
+		        return new MyLocaleResolve();
+		    }
+		
+		}
+
+	**注意:在spring2.0+的版本中，只要用户自定义了拦截器，则静态资源会被拦截。但是在spring1.0+的版本中，是不会拦截静态资源的**
+
+
+### CRUD-员工列表 ###
+
+#### RestfulCRUD：CRUD满足Rest风格 ####
+
+URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操作
+
+<table>
+<tr>
+	<td></td>
+	<td>普通CRUD（uri来区分操作）</td>
+	<td>RestfulCRUD</td>
+</tr>
+<tr>
+	<td>查询</td>
+	<td>getEmp</td>
+	<td>emp---GET</td>
+</tr>
+<tr>
+	<td>添加</td>
+	<td>addEmp?xxx</td>
+	<td>emp---POST</td>
+</tr>
+<tr>
+	<td>修改</td>
+	<td>updateEmp?id=xxx&xxx=xx</td>
+	<td>emp/{id}---PUT</td>
+</tr>
+<tr>
+	<td>删除</td>
+	<td>deleteEmp?id=1</td>
+	<td>emp/{id}---DELETE</td>
+</tr>
+
+</table>
+
+#### 请求架构 ####
+
+<table>
+<tr>
+	<td></td>
+	<td>请求URI</td>
+	<td>请求方式</td>
+</tr>
+<tr>
+	<td>查询所有员工</td>
+	<td>emps</td>
+	<td>GET</td>
+</tr>
+<tr>
+	<td>查询某个员工(来到修改页面)</td>
+	<td>emp/1</td>
+	<td>GET</td>
+</tr>
+<tr>
+	<td>来到添加页面</td>
+	<td>emp</td>
+	<td>GET</td>
+</tr>
+<tr>
+	<td>添加员工</td>
+	<td>emp</td>
+	<td>POST</td>
+</tr>
+<tr>
+	<td>来到修改页面（查出员工进行信息回显）</td>
+	<td>emp/1</td>
+	<td>GET</td>
+</tr>
+<tr>
+	<td>修改员工</td>
+	<td>emp</td>
+	<td>PUT</td>
+</tr>
+<tr>
+	<td>删除员工</td>
+	<td>emp/1</td>
+	<td>DELETE</td>
+</tr>
+</table>
+
+#### 语法 ####
+
+	1、抽取公共片段
+	<div th:fragment="copy">
+	&copy; 2011 The Good Thymes Virtual Grocery
+	</div>
+	
+	2、引入公共片段
+	<div th:insert="~{footer :: copy}"></div>
+	~{templatename::selector}：模板名::选择器
+	~{templatename::fragmentname}:模板名::片段名
+	
+	3、默认效果：
+	insert的公共片段在div标签中
+	如果使用th:insert等属性进行引入，可以不用写~{}：
+	行内写法可以加上：[[~{}]];[(~{})]；
+
+三种引入公共片段的th属性
+	
+- **th:insert**：将公共片段整个插入到声明引入的元素中
+- **th:replace**：将声明引入的元素替换为公共片段
+- **th:include**：将被引入的片段的内容包含进这个标签中
+
+		<footer th:fragment="copy">
+		&copy; 2011 The Good Thymes Virtual Grocery
+		</footer>
+		
+		引入方式
+		<div th:insert="footer :: copy"></div>
+		<div th:replace="footer :: copy"></div>
+		<div th:include="footer :: copy"></div>
+		
+		效果
+		<div>
+		    <footer>
+		    &copy; 2011 The Good Thymes Virtual Grocery
+		    </footer>
+		</div>
+		
+		<footer>
+		&copy; 2011 The Good Thymes Virtual Grocery
+		</footer>
+		
+		<div>
+		&copy; 2011 The Good Thymes Virtual Grocery
+		</div>
+
+#### 后台页面抽取 ####
+
+1. 将后台主页中的顶部导航栏作为片段，在list页面引入	
+
+	**dashboard.html**
+	
+		<!--头部-->
+		<nav class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0" th:fragment="topbar">
+		    <a class="navbar-brand col-sm-3 col-md-2 mr-0" href="http://getbootstrap.com/docs/4.0/examples/dashboard/#">[[${session.user}]]</a>
+		    <input class="form-control form-control-dark w-100" type="text" placeholder="Search" aria-label="Search">
+		    <ul class="navbar-nav px-3">
+		        <li class="nav-item text-nowrap">
+		            <a class="nav-link" href="http://getbootstrap.com/docs/4.0/examples/dashboard/#">Sign out</a>
+		        </li>
+		    </ul>
+		</nav>
+	
+	**list.html**
+	
+		<!--引入topbar-->
+		<div th:replace="~{public/bar::topbar}"></div>
+
+2. 使用选择器的方式 抽取左侧边栏代码
+
+	**dashboard.html**
+
+		<!--侧边栏-->
+		<nav class="col-md-2 d-none d-md-block bg-light sidebar" id="sidebar">
+	    	<div class="sidebar-sticky">
+	       		 <ul class="nav flex-column">
+		.....
+
+	**list.html**
+
+		<div class="row">
+			<!--引入侧边栏-->
+			<div th:replace="public/bar::#sidebar"></div>
+
+#### 引入片段传递参数 ####
+
+实现点击当前项高亮
+
+在引入代码片段的时候可以传递参数，然后在sidebar代码片段模板中判断当前点击的链接
+
+	~{templatename::selector(变量名=值)}
+
+	/*或者在定义代码片段时，定义参数*/
+	<nav th:fragment="topbar(A,B)"
+	/*引入时直接传递参数*/
+	~{templatename::fragmentname(A值,B值)}
+
+**bar.html**
+
+	 <li class="nav-item">
+        <a class="nav-link active" href="http://getbootstrap.com/docs/4.0/examples/dashboard/#" th:href="@{/main.html}" th:class="${activeUri=='main.html'?'nav-link active':'nav-link'}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-home">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            Dashboard <span class="sr-only">(current)</span>
+        </a>
+    </li>
+
+	 <li class="nav-item">
+        <a class="nav-link" href="http://getbootstrap.com/docs/4.0/examples/dashboard/#" th:href="@{/emps}" th:class="${activeUri=='emps'?'nav-link active':'nav-link'}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-users">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            员工列表
+        </a>
+    </li>
+
+**dashboard.html**
+
+	<div th:replace="public/bar::#sidebar(activeUri='main.html')"></div>
+
+**list.html**
+
+	<div th:replace="public/bar::#sidebar(activeUri='emps')"></div>
+
+**显示员工数据，添加增删改按钮**
+
+	<tbody>
+		<tr th:each="emp:${emps}">
+			<td th:text="${emp.getId()}"></td>
+			<td th:text="${emp.getLastName()}"></td>
+			<td th:text="${emp.getGender()}==0?'女':'男'"></td>
+			<td th:text="${#dates.format(emp.getBirth(), 'yyyy/MMM/dd HH:mm')}"></td>
+			<td th:text="${emp.getDepartment().getDepartmentName()}"></td>
+			<td><button class="btn btn-sm btn-primary">删除</button>
+				<button class="btn btn-sm btn-primary">修改</button></td>
+		</tr>
+	</tbody>
