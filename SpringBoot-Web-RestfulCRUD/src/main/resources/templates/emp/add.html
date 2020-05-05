@@ -44,24 +44,28 @@
 
 <body>
 <!--引入topbar-->
+<!--引入抽取的topbar-->
+<!--模板名：会使用thymeleaf的前后缀配置规则进行解析-->
 <div th:replace="~{public/bar::topbar}"></div>
 
 <div class="container-fluid">
     <div class="row">
         <!--引入侧边栏-->
+
         <div th:replace="public/bar::#sidebar(activeUri='emps')"></div>
         <main role="main" class="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4">
             <h2>添加员工</h2>
 
             <div class="table-responsive">
-                <form>
+                <!--需要区分是员工修改还是添加；-->
+                <form action="" th:action="@{/emp}" method="post">
                     <div class="form-group">
                         <label>LastName</label>
-                        <input type="text" class="form-control" placeholder="zhangsan">
+                        <input type="text" name="lastName" class="form-control" placeholder="zhangsan">
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" class="form-control" placeholder="zhangsan@atguigu.com">
+                        <input type="email" name="email" class="form-control" placeholder="zhangsan@atguigu.com">
                     </div>
                     <div class="form-group">
                         <label>Gender</label><br/>
@@ -76,14 +80,15 @@
                     </div>
                     <div class="form-group">
                         <label>department</label>
-                        <select class="form-control">
-                            <option th:each="dep:${deps}" th:text="${dep.departmentName}"></option>
+                        <!--提交的是部门的id-->
+                        <select class="form-control" name="department.id">
+                            <option th:each="dep:${deps}" th:text="${dep.departmentName}" th:value="${dep.id}"></option>
 
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Birth</label>
-                        <input type="text" class="form-control" placeholder="zhangsan">
+                        <input type="text" name="birth" class="form-control" placeholder="zhangsan">
                     </div>
                     <button type="submit" class="btn btn-primary">添加</button>
                 </form>

@@ -2386,3 +2386,107 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 				<button class="btn btn-sm btn-primary">修改</button></td>
 		</tr>
 	</tbody>
+
+#### 添加员工 ####
+
+1. 创建员工添加页面 `add.html`
+
+		<!--引入topbar-->
+		<!--引入抽取的topbar-->
+		<!--模板名：会使用thymeleaf的前后缀配置规则进行解析-->
+		<div th:replace="~{public/bar::topbar}"></div>
+		
+		<div class="container-fluid">
+		    <div class="row">
+		        <!--引入侧边栏-->
+		
+		        <div th:replace="public/bar::#sidebar(activeUri='emps')"></div>
+		        <main role="main" class="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4">
+		            <h2>添加员工</h2>
+		
+		            <div class="table-responsive">
+		                <!--需要区分是员工修改还是添加；-->
+		                <form action="" th:action="@{/emp}" method="post">
+		                    <div class="form-group">
+		                        <label>LastName</label>
+		                        <input type="text" name="lastName" class="form-control" placeholder="zhangsan">
+		                    </div>
+		                    <div class="form-group">
+		                        <label>Email</label>
+		                        <input type="email" name="email" class="form-control" placeholder="zhangsan@atguigu.com">
+		                    </div>
+		                    <div class="form-group">
+		                        <label>Gender</label><br/>
+		                        <div class="form-check form-check-inline">
+		                            <input class="form-check-input" type="radio" name="gender"  value="1">
+		                            <label class="form-check-label">男</label>
+		                        </div>
+		                        <div class="form-check form-check-inline">
+		                            <input class="form-check-input" type="radio" name="gender"  value="0">
+		                            <label class="form-check-label">女</label>
+		                        </div>
+		                    </div>
+		                    <div class="form-group">
+		                        <label>department</label>
+		                        <!--提交的是部门的id-->
+		                        <select class="form-control" name="department.id">
+		                            <option th:each="dep:${deps}" th:text="${dep.departmentName}" th:value="${dep.id}"></option>
+		
+		                        </select>
+		                    </div>
+		                    <div class="form-group">
+		                        <label>Birth</label>
+		                        <input type="text" name="birth" class="form-control" placeholder="zhangsan">
+		                    </div>
+		                    <button type="submit" class="btn btn-primary">添加</button>
+		                </form>
+		            </div>
+		        </main>
+		    </div>
+		</div>
+
+2. 点击链接跳转到添加页面
+
+		<a class="btn btn-sm btn-success" href="" th:href="@{/emp}">员工添加</a>
+
+3. `EmpController`添加映射方法
+
+		   //员工添加页面
+		    @GetMapping("/emp")
+		    public String toAddEmpPage(Model model)
+		    {
+		        //来到添加页面,查出所有的部门，在页面显示
+		        Collection<Department> departments = departmentDao.getDepartments();
+		        model.addAttribute("deps",departments);
+		        return "/emp/add";
+		    }
+
+4. 修改页面遍历添加下拉选项
+
+	 	<!--提交的是部门的id-->
+        <select class="form-control" name="department.id">
+            <option th:each="dep:${deps}" th:text="${dep.departmentName}" th:value="${dep.id}"></option>
+
+        </select>
+
+5. 表单提交，添加员工
+
+	    //员工添加
+	    //SpringMVC自动将请求参数和入参对象的属性进行一一绑定；要求请求参数的名字和javaBean入参的对象里面的属性名是一样的
+	    @PostMapping("/emp")
+	    public String addEmp(Employee employee)
+	    {
+	        System.out.println(employee);
+	        //保存员工
+	        employeeDao.save(employee);
+	        // redirect: 表示重定向到一个地址  /代表当前项目路径
+	        // forward: 表示转发到一个地址
+	        return "redirect:/emps";
+	    }
+
+**注意:具体转发和重定为什么可以支持return返回,可参照`org.thymeleaf.spring5.view.ThymeleafViewResolver#createView`源码**
+
+**注意:日期格式修改,表单提交的日期格式默认必须是yyyy/MM/dd的格式，可以在配置文件中修改格式**
+
+	#设置表单提交的时间格式
+	spring.mvc.date-format=yyyy-MM-dd
