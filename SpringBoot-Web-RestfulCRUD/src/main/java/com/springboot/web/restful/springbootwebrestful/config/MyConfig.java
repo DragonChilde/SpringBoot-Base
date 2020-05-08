@@ -2,6 +2,10 @@ package com.springboot.web.restful.springbootwebrestful.config;
 
 import com.springboot.web.restful.springbootwebrestful.component.LoginHandleInterceptor;
 import com.springboot.web.restful.springbootwebrestful.component.MyLocaleResolve;
+import org.springframework.boot.web.server.ConfigurableWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+import org.springframework.boot.web.servlet.filter.OrderedHiddenHttpMethodFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.LocaleResolver;
@@ -17,7 +21,7 @@ public class MyConfig implements WebMvcConfigurer {
 
 
     //定义不拦截路径,注意SpringBott2.0以上会把静态资源也拦截了,必须把静态webjars也排除
-    String[] url = {"/","/index","/index.html","/user/login","/asserts/**","/webjars/**"};
+    String[] url = {"/","/index","/index.html","/user/login","/asserts/**","/webjars/**","/hello","/error"};
 
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
@@ -41,5 +45,8 @@ public class MyConfig implements WebMvcConfigurer {
     {
         return new MyLocaleResolve();
     }
+
+
+
 
 }

@@ -2490,3 +2490,1010 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 
 	#设置表单提交的时间格式
 	spring.mvc.date-format=yyyy-MM-dd
+
+#### 修改员工 ####
+
+1. 点击按钮跳转到编辑页面
+
+		<a class="btn btn-sm btn-primary" th:href="@{/emp/}+${emp.getId()}">修改</a>
+
+2. 添加编辑页面，表单的提交要为post方式，提供_method参数
+
+        <form action="" th:action="@{/emp}" method="post" >
+            <!--发送put请求修改员工数据-->
+            <!--
+            1、SpringMVC中配置HiddenHttpMethodFilter;（SpringBoot自动配置好的）
+            2、页面创建一个post表单
+            3、创建一个input项，name="_method";值就是我们指定的请求方式
+            -->
+            <input type="hidden" name="_method" th:if="${emp!=null}" value="put"/>
+            <input type="hidden" name="id" th:if="${emp!=null}" th:value="${emp.id}"/>
+            <div class="form-group">
+                <label>LastName</label>
+                <input type="text" name="lastName" class="form-control" placeholder="zhangsan" th:value="${emp!=null}?${emp.lastName}">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" class="form-control" placeholder="zhangsan@atguigu.com" th:value="${emp!=null}?${emp.email}">
+            </div>
+            <div class="form-group">
+                <label>Gender</label><br/>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="gender"  value="1" th:checked="${emp!=null}?${emp.gender==1}">
+                    <label class="form-check-label">男</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="gender"  value="0" th:checked="${emp!=null}?${emp.gender==0}">
+                    <label class="form-check-label">女</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>department</label>
+                <!--提交的是部门的id-->
+                <select class="form-control" name="department.id">
+                    <option th:each="dep:${deps}" th:text="${dep.departmentName}" th:value="${dep.id}" th:selected="${emp!=null}?${emp.department.id == dep.id}"></option>
+
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Birth</label>
+                <input type="text" name="birth" class="form-control" placeholder="zhangsan" th:value="${emp!=null}?${#dates.format(emp.birth,'yyyy-MM-dd')}">
+            </div>
+            <button type="submit" class="btn btn-primary">添加</button>
+        </form>
+
+3. Controller转发到编辑页面，回显员工信息
+
+	    //来到修改页面，查出当前员工，在页面回显
+	    @GetMapping("/emp/{id}")
+	    public String toEditEmpPage(@PathVariable("id") Integer id,Model model)
+	    {
+	        //页面要显示所有的部门列表
+	        Collection<Department> departments = departmentDao.getDepartments();
+	        Employee employee = employeeDao.get(id);
+	        model.addAttribute("emp",employee);
+	        model.addAttribute("deps",departments);
+	        //回到修改页面(add是一个修改添加二合一的页面);
+	        return "/emp/add";
+	    }
+
+4. 提交表单修改员工信息
+
+		 //员工修改；需要提交员工id；
+	    @PutMapping("/emp")
+	    public String editEmp(Employee employee)
+	    {
+	        employeeDao.save(employee);
+	        System.out.println(employee);
+	        return "redirect:/emps";
+	    }
+
+
+#### 删除员工 ####
+
+1. 点击删除提交发出delete请求
+
+		//员工删除
+	    @DeleteMapping("/emp/{id}")
+	    public String deleteEmp(@PathVariable("id") Integer id)
+	    {
+	        employeeDao.delete(id);
+	        return "redirect:/emps";
+	    }
+
+**注意:如果提示不支持POST请求，在确保代码无误的情况下查看是否配置启动HiddenHttpMethodFilter**
+
+	#解决SpringBoot2.0以上,使用DELETE请求删除报不支持POST请求
+	spring.mvc.hiddenmethod.filter.enabled=true
+
+![](http://120.77.237.175:9080/photos/springboot/43.jpg)
+
+### 错误处理机制 ###
+
+当访问一个不存在的页面，或者程序抛出异常时
+
+默认效果:
+
+- 浏览器返回一个默认的错误页面， 注意看浏览器发送请求的`请求头`
+
+	![](http://120.77.237.175:9080/photos/springboot/44.jpg)
+
+- 其他客户端返回json数据，注意看`请求头`
+
+	![](http://120.77.237.175:9080/photos/springboot/45.png)
+
+
+查看`org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration`源码
+
+这里是springboot错误处理的自动配置信息,给容器中添加了以下组件
+
+1. DefaultErrorAttributes
+2. BasicErrorController：处理默认/error请求
+3. ErrorPageCustomizer
+4. DefaultErrorViewResolver
+
+#### ErrorPageCustomizer ####
+
+	@Bean
+	public ErrorPageCustomizer errorPageCustomizer(DispatcherServletPath dispatcherServletPath) {
+		return new ErrorPageCustomizer(this.serverProperties, dispatcherServletPath);
+	}
+
+----
+
+	private static class ErrorPageCustomizer implements ErrorPageRegistrar, Ordered {
+
+		private final ServerProperties properties;
+	
+		private final DispatcherServletPath dispatcherServletPath;
+	
+		protected ErrorPageCustomizer(ServerProperties properties, DispatcherServletPath dispatcherServletPath) {
+			this.properties = properties;
+			this.dispatcherServletPath = dispatcherServletPath;
+		}
+	
+		//注册错误页面
+		@Override
+		public void registerErrorPages(ErrorPageRegistry errorPageRegistry) {
+			//getPath()获取到的是"/error"，见下图
+			ErrorPage errorPage = new ErrorPage(
+					this.dispatcherServletPath.getRelativePath(this.properties.getError().getPath()));
+			errorPageRegistry.addErrorPages(errorPage);
+		}
+	
+		@Override
+		public int getOrder() {
+			return 0;
+		}
+
+	}
+
+![](http://120.77.237.175:9080/photos/springboot/46.jpg)
+
+当请求出现错误后就会转发到/error
+
+然后这个error请求就会被BasicErrorController处理；
+
+#### BasicErrorController ####
+
+	@Bean
+	@ConditionalOnMissingBean(value = ErrorController.class, search = SearchStrategy.CURRENT)
+	public BasicErrorController basicErrorController(ErrorAttributes errorAttributes,
+			ObjectProvider<ErrorViewResolver> errorViewResolvers) {
+		return new BasicErrorController(errorAttributes, this.serverProperties.getError(),
+				errorViewResolvers.orderedStream().collect(Collectors.toList()));
+	}
+
+----
+
+	/**
+	  * 使用配置文件中server.error.path配置
+	  * 如果server.error.path没有配置使用error.path
+	  * 如果error.path也没有配置就使用/error
+	  */
+	@RequestMapping("${server.error.path:${error.path:/error}}")
+	public class BasicErrorController extends AbstractErrorController {
+		......
+
+		@RequestMapping(produces = MediaType.TEXT_HTML_VALUE)//产生html类型的数据；浏览器发送的请求来到这个方法处理
+		public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
+			HttpStatus status = getStatus(request);
+			Map<String, Object> model = Collections
+					.unmodifiableMap(getErrorAttributes(request, isIncludeStackTrace(request, MediaType.TEXT_HTML)));
+			response.setStatus(status.value());
+			//去哪个页面作为错误页面；包含页面地址和页面内容
+			ModelAndView modelAndView = resolveErrorView(request, response, status, model);
+			return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
+		}
+	
+		//产生json数据，其他客户端来到这个方法处理
+		@RequestMapping
+		public ResponseEntity<Map<String, Object>> error(HttpServletRequest request) {
+			HttpStatus status = getStatus(request);
+			//ResponseEntity的优先级高于@ResponseBody
+			//在不是ResponseEntity的情况下去检查有没有@ResponseBody注解
+			//如果响应类型是ResponseEntity可以不写@ResponseBody注解,写了也没有关系
+			if (status == HttpStatus.NO_CONTENT) {
+				return new ResponseEntity<>(status);
+			}
+			Map<String, Object> body = getErrorAttributes(request, isIncludeStackTrace(request, MediaType.ALL));
+			return new ResponseEntity<>(body, status);
+		}
+	}
+
+处理浏览器请求的方法 中，modelAndView存储到哪个页面的页面地址和页面内容数据
+
+看一下调用的resolveErrorView方法
+
+	protected ModelAndView resolveErrorView(HttpServletRequest request, HttpServletResponse response, HttpStatus status,
+			Map<String, Object> model) {
+		for (ErrorViewResolver resolver : this.errorViewResolvers) {
+			 //从所有的ErrorViewResolver得到ModelAndView
+			ModelAndView modelAndView = resolver.resolveErrorView(request, status, model);
+			if (modelAndView != null) {
+				return modelAndView;
+			}
+		}
+		return null;
+	}
+
+ErrorViewResolver从哪里来的呢？
+
+已经在容器中注册了一个DefaultErrorViewResolver
+
+#### DefaultErrorViewResolver ####
+
+
+	@Configuration(proxyBeanMethods = false)
+	static class DefaultErrorViewResolverConfiguration {
+
+		private final ApplicationContext applicationContext;
+
+		private final ResourceProperties resourceProperties;
+
+		DefaultErrorViewResolverConfiguration(ApplicationContext applicationContext,
+				ResourceProperties resourceProperties) {
+			this.applicationContext = applicationContext;
+			this.resourceProperties = resourceProperties;
+		}
+
+		//注册默认错误视图解析器
+		@Bean
+		@ConditionalOnBean(DispatcherServlet.class)
+		@ConditionalOnMissingBean(ErrorViewResolver.class)
+		DefaultErrorViewResolver conventionErrorViewResolver() {
+			return new DefaultErrorViewResolver(this.applicationContext, this.resourceProperties);
+		}
+
+	}
+
+然后调用`ErrorViewResolver`的`resolveErrorView()`方法
+
+	public class DefaultErrorViewResolver implements ErrorViewResolver, Ordered {
+		...
+	
+		@Override
+		public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
+			//把状态码和model传过去获取视图
+			ModelAndView modelAndView = resolve(String.valueOf(status.value()), model);
+			 //上面没有获取到视图就使用把状态吗替换再再找，以4开头的替换为4xx，5开头替换为5xx，见下文（如果定制错误响应）
+			if (modelAndView == null && SERIES_VIEWS.containsKey(status.series())) {
+				modelAndView = resolve(SERIES_VIEWS.get(status.series()), model);
+			}
+			return modelAndView;
+		}
+	
+		private ModelAndView resolve(String viewName, Map<String, Object> model) {
+			 //默认SpringBoot可以去找到一个页面？  error/404
+			String errorViewName = "error/" + viewName;
+			 //模板引擎可以解析这个页面地址就用模板引擎解析
+			TemplateAvailabilityProvider provider = this.templateAvailabilityProviders.getProvider(errorViewName,
+					this.applicationContext);
+			if (provider != null) {
+				//模板引擎可用的情况下返回到errorViewName指定的视图地址
+				return new ModelAndView(errorViewName, model);
+			}
+			//模板引擎不可用，就在静态资源文件夹下找errorViewName对应的页面   error/404.html
+			return resolveResource(errorViewName, model);
+		}
+		...
+	}
+
+如果模板引擎不可用，就调用resolveResource方法获取视图
+
+	private ModelAndView resolveResource(String viewName, Map<String, Object> model) {
+		//获取的是静态资源文件夹
+		for (String location : this.resourceProperties.getStaticLocations()) {
+			try {
+				Resource resource = this.applicationContext.getResource(location);
+				//例：static/error.html
+				resource = resource.createRelative(viewName + ".html");
+				//存在则返回视图
+				if (resource.exists()) {
+					return new ModelAndView(new HtmlResourceView(resource), model);
+				}
+			}
+			catch (Exception ex) {
+			}
+		}
+		return null;
+	}
+
+
+#### 定制错误响应页面 ####
+
+有模板引擎的情况下；将错误页面命名为 `错误状态码.html` 放在模板引擎文件夹里面的 error文件夹下发生此状态码的错误就会来到这里找对应的页面；
+
+比如我们在template文件夹下创建error/404.html当浏览器请求是404错误，就会使用我们创建的404.html页面响应，如果是其他状态码错误，还是使用默认的视图，但是如果404.html没有找到就会替换成4XX.html再查找一次，看`DefaultErrorViewResolver`中的静态代码块
+
+	static {
+		Map<Series, String> views = new EnumMap<>(Series.class);
+		views.put(Series.CLIENT_ERROR, "4xx");
+		views.put(Series.SERVER_ERROR, "5xx");
+		SERIES_VIEWS = Collections.unmodifiableMap(views);
+	}
+
+	.....
+
+	@Override
+	public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
+		 //把状态码和model传过去过去视图
+		ModelAndView modelAndView = resolve(String.valueOf(status.value()), model);
+	  //上面没有获取到视图就把状态吗替换再找，以4开头的替换为4xx，5开头替换为5xx，见下文（如果定制错误响应）
+		if (modelAndView == null && SERIES_VIEWS.containsKey(status.series())) {
+			modelAndView = resolve(SERIES_VIEWS.get(status.series()), model);
+		}
+		return modelAndView;
+	}
+
+页面可以获取哪些数据?
+
+#### DefaultErrorAttributes ####
+
+再看一下`BasicErrorController`的`errorHtml`方法
+
+	@RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
+	public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
+		HttpStatus status = getStatus(request);
+		Map<String, Object> model = Collections
+				.unmodifiableMap(getErrorAttributes(request, isIncludeStackTrace(request, MediaType.TEXT_HTML)));
+		response.setStatus(status.value());
+		ModelAndView modelAndView = resolveErrorView(request, response, status, model);
+		return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
+	}
+
+看一下调用的`getErrorAttributes()`方法
+
+	protected Map<String, Object> getErrorAttributes(HttpServletRequest request, boolean includeStackTrace) {
+		WebRequest webRequest = new ServletWebRequest(request);
+		return this.errorAttributes.getErrorAttributes(webRequest, includeStackTrace);
+	}
+
+再看`this.errorAttributes.getErrorAttributes()`方法， `this.errorAttributes`是接口类型`ErrorAttributes`，实现类就一个`DefaultErrorAttributes`，看一下`DefaultErrorAttributes`的 `getErrorAttributes()`方法
+
+	public Map<String, Object> getErrorAttributes(WebRequest webRequest, boolean includeStackTrace) {
+		Map<String, Object> errorAttributes = new LinkedHashMap<>();
+		errorAttributes.put("timestamp", new Date());
+		addStatus(errorAttributes, webRequest);
+		addErrorDetails(errorAttributes, webRequest, includeStackTrace);
+		addPath(errorAttributes, webRequest);
+		return errorAttributes;
+	}
+
+- timestamp：时间戳
+- status：状态码
+- error：错误提示
+- exception：异常对象
+- message：异常消息
+- errors：JSR303数据校验的错误都在这里
+
+![](http://120.77.237.175:9080/photos/springboot/47.png)
+
+**注音:2.0以后默认是不显示exception的，需要在配置文件中开启**
+
+原因:
+
+![](http://120.77.237.175:9080/photos/springboot/48.jpg)
+
+`org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration`
+
+	@Bean
+	@ConditionalOnMissingBean(value = ErrorAttributes.class, search = SearchStrategy.CURRENT)
+	public DefaultErrorAttributes errorAttributes() {
+		//从配置中获取
+		return new DefaultErrorAttributes(this.serverProperties.getError().isIncludeException());
+	}
+
+没有模板引擎（模板引擎找不到这个错误页面），就会在静态资源文件夹下找；
+
+如果以上都没有找到错误页面，就是默认来到SpringBoot默认的错误提示页面；
+
+**defaultErrorView**
+
+![](http://120.77.237.175:9080/photos/springboot/49.jpg)
+
+![](http://120.77.237.175:9080/photos/springboot/50.jpg)
+
+#### 如何定制错误的json数据 ####
+
+1. 第一种方法，定义全局异常处理器类注入到容器中，捕获到异常返回json格式的数据
+
+		public class UserNotExistException extends RuntimeException{
+
+		    public UserNotExistException()
+		    {
+		        super("用户不存在");
+		    }
+		}
+
+	----
+		@ControllerAdvice
+		public class MyExceptionHandler {
+		
+		    @ResponseBody
+		    @ExceptionHandler(UserNotExistException.class)
+		    public Map<String,Object> handleException(Exception e)
+		    {
+		        HashMap<String, Object> map = new HashMap<>();
+		        map.put("code","user.notexist");
+		        map.put("message",e.getMessage());
+		        return map;
+		    }
+		}
+
+	----
+
+		@Controller
+		public class HWErrorController {
+		
+		    //@ResponseBody
+		    @GetMapping("/hello")
+		    public String error(@RequestParam("user")String user)
+		    {
+		        if (user.equals("aaa"))
+		        {
+		            throw new UserNotExistException();
+		        }
+		        return "HELLO WORLD";
+		    }
+		}
+
+	![](http://120.77.237.175:9080/photos/springboot/51.jpg)
+
+	可以看到这种没有自适应效果,返回的都是JSON格式
+
+2. 第二种方法，捕获到异常后转发到/error
+
+		@ExceptionHandler(UserNotExistException.class)
+	    public String handleException(Exception e)
+	    {
+	        HashMap<String, Object> map = new HashMap<>();
+	        map.put("code","user.notexist");
+	        map.put("message",e.getMessage());
+	        return "forward:/error";
+	    }
+
+	但这样异常被我们捕获然后转发，显示的状态码就是200，跳转到指定错误页面,所以在转发之前还要设置一下状态码
+
+	    @ExceptionHandler(UserNotExistException.class)
+	    public String handleException(Exception e, HttpServletRequest request)
+	    {
+	        HashMap<String, Object> map = new HashMap<>();
+	        map.put("code","user.notexist");
+	        map.put("message",e.getMessage());
+	        //传入我们自己的错误状态码  4xx 5xx，否则就不会进入定制错误页面的解析流程
+	        /**
+	         * Integer statusCode = (Integer) request
+	         .getAttribute("javax.servlet.error.status_code");
+	         */
+	        request.setAttribute("javax.servlet.error.status_code",500);
+	        return "forward:/error";
+	    }
+
+	但是设置的数据就没有用了，只能使用默认的
+3. 将我们的定制数据携带出去
+
+	上面我们已经知道数据的来源是调用DefaultErrorAttributes的getErrorAttributes方法得到的，而这个DefaultErrorAttributes是在ErrorMvcAutoConfiguration配置类中注册的，并且注册之前会检查容器中是否已经拥有
+
+		@Bean
+		@ConditionalOnMissingBean(value = ErrorAttributes.class, search = SearchStrategy.CURRENT)
+		public DefaultErrorAttributes errorAttributes() {
+		    //从配置中获取
+		    return new DefaultErrorAttributes(this.serverProperties.getError().isIncludeException());
+		}
+
+	所以我们可以只要实现ErrorAttributes接口或者继承DefaultErrorAttributes类，然后注册到容器中就行了
+
+	出现错误以后，会来到/error请求，会被BasicErrorController处理，响应出去可以获取的数据是由getErrorAttributes得到的（是AbstractErrorController（ErrorController）规定的方法）；
+
+	​	1. 完全来编写一个ErrorController的实现类【或者是编写AbstractErrorController的子类】，放在容器中；
+	
+	​	2. 页面上能用的数据，或者是json返回能用的数据都是通过errorAttributes.getErrorAttributes得到；
+	
+	​			容器中DefaultErrorAttributes.getErrorAttributes()；默认进行数据处理的；
+	
+	
+	    @ExceptionHandler(UserNotExistException.class)
+	    public String handleException(Exception e, HttpServletRequest request)
+	    {
+	        HashMap<String, Object> map = new HashMap<>();
+	        map.put("code","user.notexist");
+	        map.put("message",e.getMessage());
+	        //传入我们自己的错误状态码  4xx 5xx，否则就不会进入定制错误页面的解析流程
+	        /**
+	         * Integer statusCode = (Integer) request
+	         .getAttribute("javax.servlet.error.status_code");
+	         */
+	        request.setAttribute("javax.servlet.error.status_code",500);
+	        request.setAttribute("ext",map);
+	        return "forward:/error";
+	    }
+	
+	------
+	
+		//给容器中加入我们自己定义的ErrorAttributes
+		@Component
+		public class MyErrorAttributes extends DefaultErrorAttributes {
+		
+		    //返回值的map就是页面和json能获取的所有字段
+		    @Override
+		    public Map<String, Object> getErrorAttributes(WebRequest webRequest, boolean includeStackTrace) {
+		        //调用父类的方法获取默认的数据
+		        Map<String, Object> map = super.getErrorAttributes(webRequest, includeStackTrace);
+		        //从request域从获取到自定义数据
+		        Map<String, Object> ext =  (Map<String, Object>)webRequest.getAttribute("ext", RequestAttributes.SCOPE_REQUEST);
+		        map.putAll(ext);
+		        return map;
+		    }
+		}
+
+
+	最终的效果：响应是自适应的，可以通过定制ErrorAttributes改变需要返回的内容
+
+	![](http://120.77.237.175:9080/photos/springboot/53.jpg)
+
+
+### 配置嵌入式Servlet容器 ###
+SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
+
+![](http://120.77.237.175:9080/photos/springboot/54.jpg)
+
+#### 如何定制和修改Servlet容器的相关配置 ####
+
+1. 修改和server有关的配置（`ServerProperties`【也是WebServerFactoryCustomizer】）；
+	
+		server.port=8081
+		server.context-path=/crud
+		
+		server.tomcat.uri-encoding=UTF-8
+		
+		//通用的Servlet容器设置
+		server.xxx
+		//Tomcat的设置
+		server.tomcat.xxx
+
+2. 2.0以后改为**WebServerFactoryCustomizer**：嵌入式的Servlet容器的定制器；来修改Servlet容器的配置：嵌入式的Servlet容器的定制器；来修改Servlet容器的配置
+
+	    //配置嵌入式的Servlet容器
+	    @Bean
+	    public WebServerFactoryCustomizer webServerFactoryCustomizer()
+	    {
+	        //定制嵌入式的Servlet容器相关的规则
+	        return new WebServerFactoryCustomizer<ConfigurableWebServerFactory>() {
+	            @Override
+	            public void customize(ConfigurableWebServerFactory factory) {
+	                factory.setPort(8081);
+	            }
+	        };
+	
+	    }
+
+**注意:代码方式的配置会覆盖配置文件的配置**
+
+#### 注册Servlet三大组件 ####
+
+由于`SpringBoot`默认是以jar包的方式启动嵌入式的`Servlet`容器来启动`SpringBoot`的web应用，没有`web.xml`文件
+
+注册三大组件用以下方式
+
+- **Servlet**
+
+		public class MyServlet  extends HttpServlet {
+		    @Override
+		    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		
+		        doPost(req,resp);
+		    }
+		
+		    @Override
+		    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		        resp.getWriter().write("hello world!");
+		    }
+		}
+	
+	向容器中添加`ServletRegistrationBean`
+
+		   @Bean
+	    public ServletRegistrationBean myServlet()
+	    {
+	        return new ServletRegistrationBean(new MyServlet(), "/myServlet");
+	
+	    }
+
+- **Filter**
+
+		public class MyFilter implements Filter {
+		    @Override
+		    public void init(FilterConfig filterConfig) throws ServletException {
+		    }
+		
+		    @Override
+		    public void destroy() {
+		    }
+		
+		    @Override
+		    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+		        System.out.println("doFilter.....");
+		    }
+		}
+
+	向容器中添加`FilterRegistrationBean`
+
+	    @Bean
+	    public FilterRegistrationBean myFilter()
+	    {
+	        FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean();
+	        filterRegistrationBean.setFilter(new MyFilter());
+	        filterRegistrationBean.setUrlPatterns(Arrays.asList("/myFilter"));
+	        return filterRegistrationBean;
+	    }
+
+- **Listener**
+
+		public class MyListener implements ServletContextListener {
+		    @Override
+		    public void contextInitialized(ServletContextEvent sce) {
+		        System.out.println("contextInitialized...web启动");
+		    }
+		
+		    @Override
+		    public void contextDestroyed(ServletContextEvent sce) {
+		        System.out.println("contextDestroyed....项目销毁");
+		    }
+		}
+
+	向容器中注入`ServletListenerRegistrationBean`
+
+	    @Bean
+	    public ServletListenerRegistrationBean myListener()
+	    {
+	        return new ServletListenerRegistrationBean<>(new MyListener());
+	
+	    }
+
+#### 替换为其他嵌入式Servlet容器 ####
+
+如果要换成其他的就把Tomcat的依赖排除掉，然后引入其他嵌入式`Servlet`容器的以来，如`Jetty`，`Undertow`
+
+默认支持：
+
+- **Tomcat（默认使用）**
+
+		<dependency>
+	        <groupId>org.springframework.boot</groupId>
+	        <artifactId>spring-boot-starter-web</artifactId>
+			引入web模块默认就是使用嵌入式的Tomcat作为Servlet容器；
+	    </dependency>
+
+
+- **Jetty**
+
+		<!-- 引入web模块 -->
+		 <dependency>
+	        <groupId>org.springframework.boot</groupId>
+	        <artifactId>spring-boot-starter-web</artifactId>
+	        <exclusions>
+	            <exclusion>
+	                <artifactId>spring-boot-starter-tomcat</artifactId>
+	                <groupId>org.springframework.boot</groupId>
+	            </exclusion>
+	        </exclusions>
+	    </dependency>
+	
+		<!--引入其他的Servlet容器-->
+	    <dependency>
+	        <artifactId>spring-boot-starter-jetty</artifactId>
+	        <groupId>org.springframework.boot</groupId>
+	    </dependency>
+
+- **Undertow**
+
+		<!-- 引入web模块 -->
+		<dependency>
+		   <groupId>org.springframework.boot</groupId>
+		   <artifactId>spring-boot-starter-web</artifactId>
+		   <exclusions>
+		      <exclusion>
+		         <artifactId>spring-boot-starter-tomcat</artifactId>
+		         <groupId>org.springframework.boot</groupId>
+		      </exclusion>
+		   </exclusions>
+		</dependency>
+		
+		<!--引入其他的Servlet容器-->
+		<dependency>
+		   <artifactId>spring-boot-starter-undertow</artifactId>
+		   <groupId>org.springframework.boot</groupId>
+		</dependency>
+
+
+#### 嵌入式Servlet容器自动配置原理 ####
+
+**注意:2.0不再使用`EmbeddedServletContainerAutoConfiguration`,用的是`ServletWebServerFactoryAutoConfiguration`**
+
+**`ServletWebServerFactoryAutoConfiguration`：嵌入式的web服务器自动配置**
+
+	@Configuration(proxyBeanMethods = false)
+	@AutoConfigureOrder(Ordered.HIGHEST_PRECEDENCE)
+	@ConditionalOnClass(ServletRequest.class)
+	@ConditionalOnWebApplication(type = Type.SERVLET)
+	@EnableConfigurationProperties(ServerProperties.class)
+	@Import({ ServletWebServerFactoryAutoConfiguration.BeanPostProcessorsRegistrar.class,
+			ServletWebServerFactoryConfiguration.EmbeddedTomcat.class,
+			ServletWebServerFactoryConfiguration.EmbeddedJetty.class,
+			ServletWebServerFactoryConfiguration.EmbeddedUndertow.class })
+	//导入BeanPostProcessorsRegistrar：Spring注解版；给容器中导入一些组件
+	public class ServletWebServerFactoryAutoConfiguration {
+		.....
+	}
+
+**`EmbeddedTomcat.class`**
+
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass({ Servlet.class, Tomcat.class, UpgradeProtocol.class })//判断当前是否引入了Tomcat依赖
+	/**
+	判断当前容器没有用户自己定义ServletWebServerFactory：嵌入式的Servlet容器工厂；作用：创建嵌入式的Servlet容器
+	**/
+	@ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
+	static class EmbeddedTomcat {
+
+		@Bean
+		TomcatServletWebServerFactory tomcatServletWebServerFactory(
+				ObjectProvider<TomcatConnectorCustomizer> connectorCustomizers,
+				ObjectProvider<TomcatContextCustomizer> contextCustomizers,
+				ObjectProvider<TomcatProtocolHandlerCustomizer<?>> protocolHandlerCustomizers) {
+			TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory();
+			factory.getTomcatConnectorCustomizers()
+					.addAll(connectorCustomizers.orderedStream().collect(Collectors.toList()));
+			factory.getTomcatContextCustomizers()
+					.addAll(contextCustomizers.orderedStream().collect(Collectors.toList()));
+			factory.getTomcatProtocolHandlerCustomizers()
+					.addAll(protocolHandlerCustomizers.orderedStream().collect(Collectors.toList()));
+			return factory;
+		}
+
+	}
+
+**`EmbeddedJetty`**
+
+	/**
+	 * Nested configuration if Jetty is being used.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass({ Servlet.class, Server.class, Loader.class, WebAppContext.class })
+	@ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
+	static class EmbeddedJetty {
+
+		@Bean
+		JettyServletWebServerFactory JettyServletWebServerFactory(
+				ObjectProvider<JettyServerCustomizer> serverCustomizers) {
+			JettyServletWebServerFactory factory = new JettyServletWebServerFactory();
+			factory.getServerCustomizers().addAll(serverCustomizers.orderedStream().collect(Collectors.toList()));
+			return factory;
+		}
+
+	}
+
+**`EmbeddedUndertow`**
+
+	/**
+	 * Nested configuration if Undertow is being used.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass({ Servlet.class, Undertow.class, SslClientAuthMode.class })
+	@ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
+	static class EmbeddedUndertow {
+
+		@Bean
+		UndertowServletWebServerFactory undertowServletWebServerFactory(
+				ObjectProvider<UndertowDeploymentInfoCustomizer> deploymentInfoCustomizers,
+				ObjectProvider<UndertowBuilderCustomizer> builderCustomizers) {
+			UndertowServletWebServerFactory factory = new UndertowServletWebServerFactory();
+			factory.getDeploymentInfoCustomizers()
+					.addAll(deploymentInfoCustomizers.orderedStream().collect(Collectors.toList()));
+			factory.getBuilderCustomizers().addAll(builderCustomizers.orderedStream().collect(Collectors.toList()));
+			return factory;
+		}
+
+	}
+
+
+**`ServletWebServerFactory`：嵌入式的web服务器工厂**
+
+		public interface ServletWebServerFactory {
+		
+			//获取嵌入式的Servlet容器
+			WebServer getWebServer(ServletContextInitializer... initializers);
+		
+		}
+	
+其实现类
+
+![](http://120.77.237.175:9080/photos/springboot/55.jpg)
+
+**`WebServer`：嵌入式的web服务器实现**
+
+![](http://120.77.237.175:9080/photos/springboot/56.jpg)
+
+以`TomcatServletWebServerFactory`为例
+
+	public WebServer getWebServer(ServletContextInitializer... initializers) {
+		if (this.disableMBeanRegistry) {
+			Registry.disableRegistry();
+		}
+		//创建一个Tomcat
+		Tomcat tomcat = new Tomcat();
+		//配置Tomcat的基本环境，（tomcat的配置都是从本类获取的，tomcat.setXXX）
+		File baseDir = (this.baseDirectory != null) ? this.baseDirectory : createTempDir("tomcat");
+		tomcat.setBaseDir(baseDir.getAbsolutePath());
+		Connector connector = new Connector(this.protocol);
+		connector.setThrowOnFailure(true);
+		tomcat.getService().addConnector(connector);
+		customizeConnector(connector);
+		tomcat.setConnector(connector);
+		tomcat.getHost().setAutoDeploy(false);
+		configureEngine(tomcat.getEngine());
+		for (Connector additionalConnector : this.additionalTomcatConnectors) {
+			tomcat.getService().addConnector(additionalConnector);
+		}
+		prepareContext(tomcat.getHost(), initializers);
+		//将配置好的Tomcat传入进去，返回一个WebServer；并且启动Tomcat服务器
+		return getTomcatWebServer(tomcat);
+	}
+
+
+	protected TomcatWebServer getTomcatWebServer(Tomcat tomcat) {
+		//初始化Tomcat服务器,当端口号大于0时自动启 动
+		return new TomcatWebServer(tomcat, getPort() >= 0);
+	}
+
+**对嵌入式容器的配置修改是怎么生效的?**
+
+#### 配置修改原理 ####
+
+1. 使用配置类修改配置为何生效
+
+	`ServletWebServerFactoryAutoConfiguration`在向容器中添加web容器时还添加了一个组件
+	
+	![](http://120.77.237.175:9080/photos/springboot/57.jpg)
+	
+	`BeanPostProcessorsRegistrar`：后置处理器注册器(也是给容器注入一些组件,可以看到下图注册了两个组件)
+	
+	![](http://120.77.237.175:9080/photos/springboot/58.jpg)
+	
+	**`WebServerFactoryCustomizerBeanPostProcessor`**
+	
+		public class WebServerFactoryCustomizerBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware {
+		
+			....
+			 //在Bean初始化之前
+			@Override
+			public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+				if (bean instanceof WebServerFactory) {
+					postProcessBeforeInitialization((WebServerFactory) bean);
+				}
+				return bean;
+			}
+		
+			@Override
+			public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+				return bean;
+			}
+		
+			@SuppressWarnings("unchecked")
+			private void postProcessBeforeInitialization(WebServerFactory webServerFactory) {
+				//获取所有的定制器，调用每一个定制器的customize方法来给Servlet容器进行属性赋值；
+				LambdaSafe.callbacks(WebServerFactoryCustomizer.class, getCustomizers(), webServerFactory)
+						.withLogger(WebServerFactoryCustomizerBeanPostProcessor.class)
+						.invoke((customizer) -> customizer.customize(webServerFactory));
+			}
+				...
+		}
+
+2. 使用配置文件为何生效
+
+	**`EmbeddedWebServerFactoryCustomizerAutoConfiguration`**
+	
+		@Configuration(proxyBeanMethods = false)
+		@ConditionalOnWebApplication
+		//把配置文件类注入进来
+		@EnableConfigurationProperties(ServerProperties.class)
+		public class EmbeddedWebServerFactoryCustomizerAutoConfiguration {
+	
+		@Configuration(proxyBeanMethods = false)
+		@ConditionalOnClass({ Tomcat.class, UpgradeProtocol.class })
+		public static class TomcatWebServerFactoryCustomizerConfiguration {
+	
+			@Bean
+			public TomcatWebServerFactoryCustomizer tomcatWebServerFactoryCustomizer(Environment environment,
+					ServerProperties serverProperties) {
+				return new TomcatWebServerFactoryCustomizer(environment, serverProperties);
+			}
+	
+		}
+
+
+**总结**：
+
+1. SpringBoot根据导入的依赖情况，给容器中添加相应的`XXXServletWebServerFactory`
+2. 容器中某个组件要创建对象就会惊动后置处理器 `webServerFactoryCustomizerBeanPostProcessor`只要是嵌入式的是Servlet容器工厂，后置处理器就会工作；
+3. 后置处理器，从容器中获取所有的WebServerFactoryCustomizer，调用定制器的定制方法给工厂添加配置
+
+#### 嵌入式Servlet容器启动原理 ####
+
+什么时候创建嵌入式的Servlet容器工厂？什么时候获取嵌入式的Servlet容器并启动Tomcat
+
+以下以`EmbeddedWebServerFactoryCustomizerAutoConfiguration`的`Tomcat`启动为例
+
+1. SpringBoot应用启动运行run方法
+
+	![](http://120.77.237.175:9080/photos/springboot/59.jpg)
+
+2. `createApplicationContext()`创建IOC容器对象，根据当前环境创建
+
+	![](http://120.77.237.175:9080/photos/springboot/60.jpg)
+
+3. `refreshContext(context);`SpringBoot刷新IOC容器【创建IOC容器对象，并初始化容器，创建容器中的每一个组件】
+4. `AbstractApplicationContext`是web应用创建**ServletWebServerApplicationContext**，否则：**AnnotationConfigApplicationContext**
+5. 刷新IOC容器中,web的ioc容器重写了onRefresh方法，查看`ServletWebServerApplicationContext`类的`onRefresh`方法,在方法中调用了`createWebServer()`;方法创建web容器
+
+	![](http://120.77.237.175:9080/photos/springboot/61.jpg)
+
+		@Override
+		protected void onRefresh() {
+			super.onRefresh();
+			try {
+				createWebServer();
+			}
+			catch (Throwable ex) {
+				throw new ApplicationContextException("Unable to start web server", ex);
+			}
+		}
+
+6. 取嵌入式的web容器工厂
+
+	![](http://120.77.237.175:9080/photos/springboot/62.jpg)
+
+	从ioc容器中获取ServletWebServerFactory 组件；**TomcatServletWebServerFactory**创建对象，后置处理器一看是这个对象，就获取所有的定制器来先定制Servlet容器的相关配置；
+
+7. 接下来就是上面的上面的相关配置流程，在创建web容器工厂时会触发`webServerFactoryCustomizerBeanPostProcessor`
+8. 嵌入式的Servlet容器创建对象并启动Servlet容器；
+9. 嵌入式的Servlet容器启动后，再将ioc容器中剩下没有创建出的对象获取出来(Controller,Service等)；
+
+#### 使用外置的Servlet容器 ####
+
+嵌入式Servlet容器：应用打成可执行的jar
+
+​- 优点：简单、便携；
+​- 缺点：默认不支持JSP、优化定制比较复杂
+
+外置的Servlet容器：外面安装Tomcat---应用war包的方式打包
+
+1. 必须创建一个war项目
+2. 编写一个类继承`SpringBootServletInitializer`，并重写`configure`方法，调用参数的sources方法springboot启动类传过去然后返回
+
+	public class ServletInitializer extends SpringBootServletInitializer {
+
+	    @Override
+	    protected SpringApplicationBuilder configure(SpringApplicationBuilder application) {
+	        return application.sources(SpringbootWebJspApplication.class);
+	    }
+	
+	}
+
+3. 把tomcat的依赖范围改为provided
+
+		 <dependency>
+	            <groupId>org.springframework.boot</groupId>
+	            <artifactId>spring-boot-starter-tomcat</artifactId>
+	            <scope>provided</scope>
+	    </dependency>
+4. project setting,可以看到当前项目下生成了`web.xml`
+
+	![](http://120.77.237.175:9080/photos/springboot/63.jpg)
+
+5. 在IDEA中可以配置外部Tomcat
+
+	![](http://120.77.237.175:9080/photos/springboot/64.jpg)
+
+6.在创建项目时使用Spring Initializr创建选择打包方式为war，1，2，3步骤会自动配置

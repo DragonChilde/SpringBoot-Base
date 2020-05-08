@@ -10,10 +10,10 @@
 
 		<title>Dashboard Template for Bootstrap</title>
 		<!-- Bootstrap core CSS -->
-		<link href="asserts/css/bootstrap.min.css" rel="stylesheet">
+		<link href="asserts/css/bootstrap.min.css" rel="stylesheet" th:href="@{/webjars/bootstrap/4.4.1-1/css/bootstrap.min.css}">
 
 		<!-- Custom styles for this template -->
-		<link href="asserts/css/dashboard.css" rel="stylesheet">
+		<link href="asserts/css/dashboard.css" rel="stylesheet"  th:href="@{/asserts/css/dashboard.css}">
 		<style type="text/css">
 			/* Chart.js */
 			
@@ -70,33 +70,36 @@
 									<td th:text="${emp.getId()}"></td>
 									<td th:text="${emp.getLastName()}"></td>
 									<td th:text="${emp.getGender()}==0?'女':'男'"></td>
-									<td th:text="${#dates.format(emp.getBirth(), 'yyyy/MMM/dd HH:mm')}"></td>
+									<td th:text="${#dates.format(emp.getBirth(), 'yyyy-MM-dd')}"></td>
 									<td th:text="${emp.getDepartment().getDepartmentName()}"></td>
-									<td><button class="btn btn-sm btn-primary">删除</button>
-										<button class="btn btn-sm btn-primary">修改</button></td>
+									<td><a class="btn btn-sm btn-primary" th:href="@{/emp/}+${emp.getId()}">修改</a>
+                                        <button th:attr="del_uri=@{/emp/}+${emp.id}" class="btn btn-sm btn-danger deleteBtn">删除</button></td>
 								</tr>
 							</tbody>
 						</table>
 					</div>
 				</main>
+                <form id="deleteEmpForm"  method="post">
+                    <input type="hidden" name="_method" value="delete"/>
+                </form>
 			</div>
 		</div>
 
 		<!-- Bootstrap core JavaScript
     ================================================== -->
 		<!-- Placed at the end of the document so the pages load faster -->
-		<script type="text/javascript" src="../../resources/asserts/js/jquery-3.2.1.slim.min.js"></script>
-		<script type="text/javascript" src="../../resources/asserts/js/popper.min.js"></script>
-		<script type="text/javascript" src="../../resources/asserts/js/bootstrap.min.js"></script>
+		<script type="text/javascript" src="/resources/asserts/js/jquery-3.2.1.slim.min.js" th:src="@{/webjars/jquery/3.5.0/jquery.slim.js}"></script>
+		<script type="text/javascript" src="/resources/asserts/js/popper.min.js" th:src="@{/asserts/js/popper.min.js}"></script>
+		<script type="text/javascript" src="/resources/asserts/js/bootstrap.min.js" th:src="@{/webjars/bootstrap/4.4.1-1/css/bootstrap.min.css}"></script>
 
 		<!-- Icons -->
-		<script type="text/javascript" src="../../resources/asserts/js/feather.min.js"></script>
+		<script type="text/javascript" src="/resources/asserts/js/feather.min.js" th:src="@{/asserts/js/feather.min.js}"></script>
 		<script>
 			feather.replace()
 		</script>
 
 		<!-- Graphs -->
-		<script type="text/javascript" src="../../resources/asserts/js/Chart.min.js"></script>
+		<script type="text/javascript" src="/resources/asserts/js/Chart.min.js" th:src="@{/asserts/js/Chart.min.js}"></script>
 		<script>
 			var ctx = document.getElementById("myChart");
 			var myChart = new Chart(ctx, {
@@ -127,6 +130,13 @@
 			});
 		</script>
 
+        <script>
+            $(".deleteBtn").click(function(){
+                //删除当前员工的
+                $("#deleteEmpForm").attr("action",$(this).attr("del_uri")).submit();
+                return false;
+            });
+        </script>
 	</body>
 
 </html>
