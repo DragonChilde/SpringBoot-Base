@@ -3497,3 +3497,1156 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 	![](http://120.77.237.175:9080/photos/springboot/64.jpg)
 
 6.在创建项目时使用Spring Initializr创建选择打包方式为war，1，2，3步骤会自动配置
+
+**注意:要使用JSP时,要把页面和相应的配置写好**
+
+![](http://120.77.237.175:9080/photos/springboot/65.jpg)
+
+#### 原理 ####
+
+- jar包：执行SpringBoot主类的main方法，启动ioc容器，创建嵌入式的Servlet容器
+- war包：启动服务器，**服务器启动SpringBoot应用**【SpringBootServletInitializer】，启动ioc容器；
+
+**规则**
+
+1. 服务器启动（web应用启动）会创建当前web应用里面每一个jar包里面ServletContainerInitializer实例：
+2. ServletContainerInitializer的实现放在jar包的META-INF/services文件夹下，有一个名为javax.servlet.ServletContainerInitializer的文件，内容就是ServletContainerInitializer的实现类的全类名
+3. 还可以使用@HandlesTypes，在应用启动的时候加载我们感兴趣的类
+
+**流程**
+
+1. 启动Tomcat
+2. 在spring-web-xxx.jar包中的METAINF/services下有javax.servlet.ServletContainerInitializer这个文件
+
+		org.springframework.web.SpringServletContainerInitializer
+
+3. `SpringServletContainerInitializer`将`@HandlesTypes(WebApplicationInitializer.class)`标注的所有这个类型的类都传入到`onStartup`方法的**`Set<Class<?>>`**；为这些`WebApplicationInitializer`类型的类创建实例
+
+		@HandlesTypes({WebApplicationInitializer.class})
+		public class SpringServletContainerInitializer implements ServletContainerInitializer {
+		    public SpringServletContainerInitializer() {
+		    }
+		
+		    public void onStartup(@Nullable Set<Class<?>> webAppInitializerClasses, ServletContext servletContext) throws ServletException {
+				.....
+			}
+		.....
+		}
+4. 每一个`WebApplicationInitializer`都调用自己的`onStartup`,其实现类如下
+
+	![](http://120.77.237.175:9080/photos/springboot/66.jpg)
+
+5. 相当于我们的SpringBootServletInitializer的类会被创建对象，并执行onStartup方法
+6. SpringBootServletInitializer实例执行onStartup的时候会createRootApplicationContext；创建容器
+
+		protected WebApplicationContext createRootApplicationContext(ServletContext servletContext) {
+			//1、创建SpringApplicationBuilder
+			SpringApplicationBuilder builder = createSpringApplicationBuilder();
+			builder.main(getClass());
+			ApplicationContext parent = getExistingRootWebApplicationContext(servletContext);
+			if (parent != null) {
+				this.logger.info("Root context already created (using as parent).");
+				servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, null);
+				builder.initializers(new ParentContextApplicationContextInitializer(parent));
+			}
+			builder.initializers(new ServletContextApplicationContextInitializer(servletContext));
+			builder.contextClass(AnnotationConfigServletWebServerApplicationContext.class);
+			//调用configure方法，子类重写了这个方法，将SpringBoot的主程序类传入了进来
+			builder = configure(builder);
+			builder.listeners(new WebEnvironmentPropertySourceInitializer(servletContext));
+			//使用builder创建一个Spring应用
+			SpringApplication application = builder.build();
+			if (application.getAllSources().isEmpty()
+					&& MergedAnnotations.from(getClass(), SearchStrategy.TYPE_HIERARCHY).isPresent(Configuration.class)) {
+				application.addPrimarySources(Collections.singleton(getClass()));
+			}
+			Assert.state(!application.getAllSources().isEmpty(),
+					"No SpringApplication sources have been defined. Either override the "
+							+ "configure method or add an @Configuration annotation");
+			// Ensure error pages are registered
+			if (this.registerErrorPageFilter) {
+				application.addPrimarySources(Collections.singleton(ErrorPageFilterConfiguration.class));
+			}
+			//启动Spring应用
+			return run(application);
+		}
+7. Spring的应用就启动并且创建IOC容器
+
+		public ConfigurableApplicationContext run(String... args) {
+			StopWatch stopWatch = new StopWatch();
+			stopWatch.start();
+			ConfigurableApplicationContext context = null;
+			Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
+			configureHeadlessProperty();
+			SpringApplicationRunListeners listeners = getRunListeners(args);
+			listeners.starting();
+			try {
+				ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+				ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
+				configureIgnoreBeanInfo(environment);
+				Banner printedBanner = printBanner(environment);
+				context = createApplicationContext();
+				exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
+						new Class[] { ConfigurableApplicationContext.class }, context);
+				prepareContext(context, environment, listeners, applicationArguments, printedBanner);
+				//刷新IOC容器
+				refreshContext(context);
+				afterRefresh(context, applicationArguments);
+				stopWatch.stop();
+				if (this.logStartupInfo) {
+					new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
+				}
+				listeners.started(context);
+				callRunners(context, applicationArguments);
+			}
+			catch (Throwable ex) {
+				handleRunFailure(context, ex, exceptionReporters, listeners);
+				throw new IllegalStateException(ex);
+			}
+	
+			try {
+				listeners.running(context);
+			}
+			catch (Throwable ex) {
+				handleRunFailure(context, ex, exceptionReporters, null);
+				throw new IllegalStateException(ex);
+			}
+			return context;
+		}
+
+
+# SpringBoot与数据访问 #
+
+## JDBC ##
+
+**依赖**
+		
+   	<dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+	 <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <scope>runtime</scope>
+    </dependency>
+
+**配置**
+
+	spring:
+	  datasource:
+	    username: root
+	    password: 123456
+	    url: jdbc:mysql://120.77.237.175:9306/springboot?serverTimezone=Asia/Shanghai
+	    driver-class-name: com.mysql.cj.jdbc.Driver
+
+
+**测试**
+
+	@SpringBootTest
+	class SpringbootDataJdbcApplicationTests {
+	
+	    @Autowired
+	    DataSource dataSource;
+	
+	    @Test
+	    void contextLoads() throws SQLException {
+	        System.out.println(dataSource.getClass());	//class com.zaxxer.hikari.HikariDataSource
+	
+	        System.out.println(dataSource.getConnection());	//HikariProxyConnection@1507604180 wrapping com.mysql.cj.jdbc.ConnectionImpl@12fcc71f
+	    }
+	
+	}
+
+
+`springboot`2.0以上默认是使用**`com.zaxxer.hikari.HikariDataSource`**作为数据源，2.0以下是用**`org.apache.tomcat.jdbc.pool.DataSource`**作为数据源；
+
+数据源的相关配置都在DataSourceProperties里面
+
+## 自动配置原理 ##
+
+`jdbc`的相关配置都在**`org.springframework.boot.autoconfigure.jdbc`**包下
+
+1. 参考**`DataSourceConfiguration`**，根据配置创建数据源，默认使用`Hikari`连接池；可以使用`spring.datasource.type`指定自定义的数据源类型；
+2. springboot默认支持的连池
+	- org.apache.tomcat.jdbc.pool.DataSource
+	- com.zaxxer.hikari.HikariDataSource
+	- org.apache.commons.dbcp2.BasicDataSource
+3. 自定义数据源类型
+
+		@Configuration(proxyBeanMethods = false)
+		@ConditionalOnMissingBean(DataSource.class)
+		@ConditionalOnProperty(name = "spring.datasource.type")
+		static class Generic {
+	
+			@Bean
+			DataSource dataSource(DataSourceProperties properties) {
+				//使用DataSourceBuilder创建数据源，利用反射创建响应type的数据源，并且绑定相关属性
+				return properties.initializeDataSourceBuilder().build();
+			}
+	
+		}
+
+## 启动应用执行sql ##
+
+`SpringBoot`在创建连接池后还会运行预定义的SQL脚本文件，具体参考**`org.springframework.boot.autoconfigure.jdbc.DataSourceInitializationConfiguration`**配置类，
+
+在该类中注册了`dataSourceInitializerPostProcessor`
+
+**`org.springframework.boot.autoconfigure.jdbc.DataSourceInitializer`**
+下面是获取schema脚本文件的方法
+
+	void initSchema() {
+		List<Resource> scripts = getScripts("spring.datasource.data", this.properties.getData(), "data");
+		if (!scripts.isEmpty()) {
+			if (!isEnabled()) {
+				logger.debug("Initialization disabled (not running data scripts)");
+				return;
+			}
+			String username = this.properties.getDataUsername();
+			String password = this.properties.getDataPassword();
+			runScripts(scripts, username, password);
+		}
+	}
+
+----
+
+	private List<Resource> getScripts(String propertyName, List<String> resources, String fallback) {
+		if (resources != null) {
+			return getResources(propertyName, resources, true);
+		}
+		String platform = this.properties.getPlatform();
+		List<String> fallbackResources = new ArrayList<>();
+		fallbackResources.add("classpath*:" + fallback + "-" + platform + ".sql");
+		fallbackResources.add("classpath*:" + fallback + ".sql");
+		return getResources(propertyName, fallbackResources, false);
+	}
+
+
+可以看出，如果我们没有在配置文件中配置脚本的具体位置，就会在`classpath`下找`schema-all.sql`和`schema.sql platform`获取的是`all`，`platform`可以在配置文件中修改
+
+具体查看`createSchema()`方法和`initSchema()`方法
+
+`initSchema()`方法获取的是`data-all.sql`，`data.sql`
+
+我们也可以在配置文件中配置sql文件的位置
+
+	#schema-*.sql、data-*.sql
+	#默认规则：schema.sql，schema-all.sql；
+	spring:
+	  datasource:
+	    schema:
+	      - classpath:department.sql		#指定位置
+
+**测试**
+
+	DROP TABLE IF EXISTS `department`;
+	CREATE TABLE `department` (
+	  `id` int(11) NOT NULL AUTO_INCREMENT,
+	  `departmentName` varchar(255) DEFAULT NULL,
+	  PRIMARY KEY (`id`)
+	) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+**注意:程序启动后发现表并没有被创建,通过看DataSourceInitializer源码发现**
+
+![](http://120.77.237.175:9080/photos/springboot/67.jpg)
+
+**默认配置**:
+
+	private DataSourceInitializationMode initializationMode = DataSourceInitializationMode.EMBEDDED;
+
+**修改配置**:
+
+	spring:
+	  datasource:
+	    initialization-mode: always
+
+- schema.sql：建表语句
+- data.sql：插入数据
+
+
+**注意：项目每次启动都会重新执行一次sql配置文件**
+
+## 整合Druid数据源 ##
+
+**依赖**
+
+	 <dependency>
+        <groupId>com.alibaba</groupId>
+        <artifactId>druid-spring-boot-starter</artifactId>
+        <version>1.1.20</version>
+    </dependency>
+
+**增加配置**
+
+	spring:
+	  datasource:
+		 type: com.alibaba.druid.pool.DruidDataSource  #配置Druid连接池
+
+**测试**
+
+	    @Test
+	    void contextLoads() throws SQLException {
+	        System.out.println(dataSource.getClass());	//class com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceWrapper
+	
+	        System.out.println(dataSource.getConnection());	//com.mysql.cj.jdbc.ConnectionImpl@34d52ecd
+	    }
+
+
+**增加Druid配置**
+
+	spring:
+	  datasource:
+	    username: root
+	    password: 123456
+	    url: jdbc:mysql://120.77.237.175:9306/springboot?serverTimezone=Asia/Shanghai
+	    driver-class-name: com.mysql.cj.jdbc.Driver
+	    #schema-*.sql、data-*.sql
+	    #默认规则：schema.sql，schema-all.sql；
+	    schema:
+	      - classpath:department.sql  #指定位置
+	    initialization-mode: always
+	
+	    type: com.alibaba.druid.pool.DruidDataSource  #配置Druid连接池
+	
+	    druid:
+	      # 连接池配置
+	      # 配置初始化大小、最小、最大
+	      initial-size: 1
+	      min-idle: 1
+	      max-active: 20
+	      # 配置获取连接等待超时的时间
+	      max-wait: 3000
+	      validation-query: SELECT 1 FROM DUAL
+	      test-on-borrow: false
+	      test-on-return: false
+	      test-while-idle: true
+	      pool-prepared-statements: true
+	      time-between-eviction-runs-millis: 60000
+	      min-evictable-idle-time-millis: 300000
+	      filters: stat,wall,slf4j
+	      # 配置web监控,默认配置也和下面相同(除用户名密码，enabled默认false外)，其他可以不配
+	      web-stat-filter:
+	        enabled: true
+	        url-pattern: /*
+	        exclusions: "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*"
+	      stat-view-servlet:
+	        enabled: true
+	        url-pattern: /druid/*
+	        login-username: admin
+	        login-password: root
+	        allow: 127.0.0.1
+
+可访问Druid后台监控SQL
+
+
+## 整合MyBatis ##
+
+### 依赖 ###
+
+	 <dependency>
+        <groupId>org.mybatis.spring.boot</groupId>
+        <artifactId>mybatis-spring-boot-starter</artifactId>
+        <version>2.1.2</version>
+    </dependency>
+
+### 依赖关系 ###
+
+![](http://120.77.237.175:9080/photos/springboot/68.jpg)
+
+### 项目构建 ###
+
+1. 在`resources`下创建`department.sql`和`employee.sql`，项目启动时创建表
+
+		DROP TABLE IF EXISTS `department`;
+		CREATE TABLE `department` (
+		  `id` int(11) NOT NULL AUTO_INCREMENT,
+		  `departmentName` varchar(255) DEFAULT NULL,
+		  PRIMARY KEY (`id`)
+		) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+	----
+
+		DROP TABLE IF EXISTS `employee`;
+		CREATE TABLE `employee` (
+		  `id` int(11) NOT NULL AUTO_INCREMENT,
+		  `lastName` varchar(255) DEFAULT NULL,
+		  `email` varchar(255) DEFAULT NULL,
+		  `gender` int(2) DEFAULT NULL,
+		  `d_id` int(11) DEFAULT NULL,
+		  PRIMARY KEY (`id`)
+		) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+2. 添加Deparment和Employee实体类
+
+		public class Department {
+		    private Integer id;
+		    private String departmentName;
+		
+		    public Department(Integer id, String departmentName) {
+		        this.id = id;
+		        this.departmentName = departmentName;
+		    }
+		
+		    public Department() {
+		    }
+		
+		    public Integer getId() {
+		        return id;
+		    }
+		
+		    public void setId(Integer id) {
+		        this.id = id;
+		    }
+		
+		    public String getDepartmentName() {
+		        return departmentName;
+		    }
+		
+		    public void setDepartmentName(String departmentName) {
+		        this.departmentName = departmentName;
+		    }
+		
+		    @Override
+		    public String toString() {
+		        return "Department{" +
+		                "id=" + id +
+		                ", departmentName='" + departmentName + '\'' +
+		                '}';
+		    }
+		}
+
+	----
+
+
+		public class Employee {
+		    private Integer id;
+		    private String lastName;
+		    private String email;
+		    private Integer gender;
+		    private Integer d_id;
+		
+		    public Employee(Integer id, String lastName, String email, Integer gender, Integer d_id) {
+		        this.id = id;
+		        this.lastName = lastName;
+		        this.email = email;
+		        this.gender = gender;
+		        this.d_id = d_id;
+		    }
+		
+		    public Employee() {
+		    }
+		
+		    public Integer getId() {
+		        return id;
+		    }
+		
+		    public void setId(Integer id) {
+		        this.id = id;
+		    }
+		
+		    public String getLastName() {
+		        return lastName;
+		    }
+		
+		    public void setLastName(String lastName) {
+		        this.lastName = lastName;
+		    }
+		
+		    public String getEmail() {
+		        return email;
+		    }
+		
+		    public void setEmail(String email) {
+		        this.email = email;
+		    }
+		
+		    public Integer getGender() {
+		        return gender;
+		    }
+		
+		    public void setGender(Integer gender) {
+		        this.gender = gender;
+		    }
+		
+		    public Integer getD_id() {
+		        return d_id;
+		    }
+		
+		    public void setD_id(Integer d_id) {
+		        this.d_id = d_id;
+		    }
+		
+		    @Override
+		    public String toString() {
+		        return "Employee{" +
+		                "id=" + id +
+		                ", lastName='" + lastName + '\'' +
+		                ", email='" + email + '\'' +
+		                ", gender=" + gender +
+		                ", d_id=" + d_id +
+		                '}';
+		    }
+
+3. 配置数据源相关属性(可见前一节Druid)
+
+### Mybatis增删改查(注解版) ###
+
+**Mapper**
+
+	@Mapper
+	public interface DepartmentMapper {
+	
+	    @Select("select * from department where id =#{id}")
+	    public Department getById(Integer id);
+	
+		
+	    @Options(useGeneratedKeys = true,keyProperty = "id")	//指定自增Key,添加数据后可返回其字段值
+	    @Insert("insert into department (departmentName) values (#{departmentName})")
+	    public int add(Department department);
+	
+	    @Update("update department set departmentName = #{departmentName} where id = #{id}")
+	    public  int update(Department department);
+	
+	    @Delete("delete department where id = #{id}")
+	    public int delete(Integer id);
+	}
+
+**Controller**
+
+	@RestController
+	public class DeptController {
+	
+	    @Autowired
+	    private DepartmentMapper departmentMapper;
+	
+	
+	    @GetMapping("/get/{id}")
+	    public Department getDept(@PathVariable("id") Integer id){
+	        return departmentMapper.getById(id);
+	    }
+	
+	    @GetMapping("/add")
+	    public Department addDept(Department department)
+	    {
+	         departmentMapper.add(department);
+	         return department;
+	    }
+	}
+
+**测试**:
+
+	http://localhost:8080/dept/4						//{"id":4,"departmentName":"aaa"}
+	http://localhost:8080/dept?departmentName=aaa	//{"id":4,"departmentName":"aaa"}
+
+### Mybatis配置 ###
+
+**开启驼峰命名法**
+
+	mybatis:
+	  configuration:
+	    map-underscore-to-camel-case: true
+
+也可以通过向spring容器中注入**`org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer`**的方法设置`mybatis`参数
+
+	@Configuration
+	public class MybatisConfig {
+	
+	    @Bean
+	    public ConfigurationCustomizer mybatisConfigurationCustomizer()
+	    {
+	        return new ConfigurationCustomizer() {
+	            @Override
+	            public void customize(org.apache.ibatis.session.Configuration configuration) {
+	                configuration.setMapUnderscoreToCamelCase(true);
+	            }
+	        };
+	        
+	    }
+	}
+
+
+通过看**`org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration`**发现
+
+![](http://120.77.237.175:9080/photos/springboot/69.jpg)
+
+![](http://120.77.237.175:9080/photos/springboot/70.jpg)
+
+### Mapper扫描 ###
+
+使用`@mapper`注解的类可以被扫描到容器中，但是每个`Mapper`都要加上这个注解就是一个繁琐的工作，能不能直接扫描某个包下的所有`Mapper`接口呢，当然可以，在springboot启动类上加上`@MapperScan`
+
+	@MapperScan("com.springboot.data.mybatis.springbootdatamybatis.mapper")
+	@SpringBootApplication
+	public class SpringbootDataMybatisApplication {
+	
+	    public static void main(String[] args) {
+	        SpringApplication.run(SpringbootDataMybatisApplication.class, args);
+	    }
+	
+	}
+
+
+### 使用xml配置文件 ###
+
+1. 创建`mybatis`全局配置文件
+
+	<?xml version="1.0" encoding="UTF-8" ?>
+	<!DOCTYPE configuration
+	        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+	        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+	<configuration>
+	    <settings>
+			 <!--启驼峰命名自动映射-->
+	        <setting name="mapUnderscoreToCamelCase" value="true"/>
+	    </settings>
+	</configuration>
+
+2. 创建`EmployeeMapper`接口
+
+	public interface EmployeeMapper {
+
+	    public List<Employee> getAll();
+	
+	    public Employee getById(Integer id);
+	}
+
+3. 创建`EmployeeMapper.xml`映射文件
+
+		<?xml version="1.0" encoding="UTF-8" ?>
+		<!DOCTYPE mapper
+		        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+		<mapper namespace="com.springboot.data.mybatis.springbootdatamybatis.mapper.EmployeeMapper">
+		    <select id="getById" resultType="com.springboot.data.mybatis.springbootdatamybatis.entity.Employee">
+		        select * from employee where id = #{id}
+		  </select>
+		</mapper>
+
+4. 配置文件(`application.yaml`)中指定配置文件和映射文件的位置
+
+		mybatis:
+		  config-location: classpath:/mybatis/mybatis.xml #指定全局配置文件的位置
+		  mapper-locations: classpath:/mybatis/mapper/*.xml #指定sql映射文件的位置
+
+5. 创建`EmpController`
+
+		@RestController
+		public class EmpController {
+		
+		    @Autowired
+		    private EmployeeMapper employeeMapper;
+		
+		    @GetMapping("/emp/{id}")
+		    public Employee getEmpById(@PathVariable("id") Integer id){
+		        return employeeMapper.getById(id);
+				/**
+					{"id":1,"lastName":"张三","email":"test@test.com","gender":1,"d_id":1}****
+				**/
+		    }
+		}
+
+# 整合SpringData JPA #
+
+
+![](http://120.77.237.175:9080/photos/springboot/71.png)
+
+**依赖**
+
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+1. 编写一个实体类（bean）和数据表进行映射，并且配置好映射关系
+
+		//使用JPA注解配置映射关系
+		@Entity //告诉JPA这是一个实体类（和数据表映射的类）
+		@Table(name = "user")   //@Table来指定和哪个数据表对应;如果省略默认表名就是user；
+		public class User {
+		
+		    @Id //这是一个主键
+		    @GeneratedValue(strategy = GenerationType.IDENTITY) //这是和数据表对应的一个列
+		    private Integer id;
+		
+		    @Column(name="last_name",length = 50)   //这是和数据表对应的一个列
+		    private String lastName;
+		
+		    @Column //省略默认列名就是属性名
+		    private String email;
+		
+			......
+		}
+
+2. DAO
+
+		/**
+		 * 继承JpaRepository来完成对数据库的操作
+		 * 泛型是（实体类，主键）
+		 */
+		public interface UserRepository extends JpaRepository<User,Integer> {
+		}
+
+3. 配置文件
+
+		spring:
+		  datasource:
+		    username: root
+		    password: 123456
+		    url: jdbc:mysql://120.77.237.175:9306/springboot?serverTimezone=Asia/Shanghai
+		    driver-class-name: com.mysql.cj.jdbc.Driver
+		  jpa:
+		    hibernate:
+		      ddl-auto: update
+		    show-sql: true
+
+4. Contoller
+
+		@RestController
+		public class UserController {
+	
+	    @Autowired
+		    private UserRepository userRepository;
+		
+		    @GetMapping("/user/{id}")
+		    public User getUserById(@PathVariable("id") Integer id){
+		        Optional<User> user = userRepository.findById(id);
+		        return user.get();
+				/**查询结果:
+					{"id":1,"lastName":"李四","email":"test@test.com"}
+				**/
+
+				/**SQL打印:
+					Hibernate: select user0_.id as id1_0_0_, user0_.email as email2_0_0_, user0_.last_name as last_nam3_0_0_ from user user0_ where user0_.id=?
+				**/
+		    }
+		}
+
+# 启动配置原理 #
+
+![](http://120.77.237.175:9080/photos/springboot/72.png)
+
+几个重要的事件回调机制,配置在META-INF/spring.factories
+
+- **ApplicationContextInitializer**
+
+- **SpringApplicationRunListener**
+
+只需要放在ioc容器中
+
+- **ApplicationRunner**
+
+- **CommandLineRunner**
+
+## 启动流程 ##
+
+	 public static void main(String[] args) {
+		//xxx.class：主配置类，（可以传多个）
+        SpringApplication.run(SpringbootStarterApplication.class, args);
+    }
+
+1. 从`run`方法开始，创建**`SpringApplication`**，然后再调用`run`方法
+
+		/**(可配置的应用程序上下文)**/
+	    public static ConfigurableApplicationContext run(Class<?> primarySource, String... args) {
+			//调用下面的run方法
+	        return run(new Class[]{primarySource}, args);
+	    }
+	
+	    public static ConfigurableApplicationContext run(Class<?>[] primarySources, String[] args) {
+	        return (new SpringApplication(primarySources)).run(args);
+	    }
+
+2. 创建**`SpringApplication`**
+
+		public SpringApplication(Class<?>... primarySources) {
+			this(null, primarySources);
+		}
+	
+
+		@SuppressWarnings({ "unchecked", "rawtypes" })
+		public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
+			this.resourceLoader = resourceLoader;
+			Assert.notNull(primarySources, "PrimarySources must not be null");
+			 //保存主配置类
+			this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
+			 //获取当前应用的类型，是不是web应用，见2.1
+			this.webApplicationType = WebApplicationType.deduceFromClasspath();
+			//从类路径下找到META‐INF/spring.factories配置的所有ApplicationContextInitializer；然后保存起来,见2.2
+			setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+			//从类路径下找到META‐INF/spring.ApplicationListener；然后保存起来,原理同上
+			setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
+			 //从多个配置类中找到有main方法的主配置类，见下图(在调run方法的时候是可以传递多个配置类的)
+			this.mainApplicationClass = deduceMainApplicationClass();
+			//执行完毕，SpringApplication对象就创建出来了，返回到1处，调用SpringApplication对象的run方法,到3
+		}
+	2.1 判断是不是web 应用
+
+		static WebApplicationType deduceFromClasspath() {
+			if (ClassUtils.isPresent(WEBFLUX_INDICATOR_CLASS, null) && !ClassUtils.isPresent(WEBMVC_INDICATOR_CLASS, null)
+					&& !ClassUtils.isPresent(JERSEY_INDICATOR_CLASS, null)) {
+				return WebApplicationType.REACTIVE;
+			}
+			for (String className : SERVLET_INDICATOR_CLASSES) {
+				if (!ClassUtils.isPresent(className, null)) {
+					return WebApplicationType.NONE;
+				}
+			}
+			return WebApplicationType.SERVLET;
+		}
+
+	2.2 `getSpringFactoriesInstances(ApplicationContextInitializer.class))`
+		
+		private <T> Collection<T> getSpringFactoriesInstances(Class<T> type) {
+			 //调用下面重载方法，type：ApplicationContextInitializer.class
+			return getSpringFactoriesInstances(type, new Class<?>[] {});
+		}
+
+	-----
+
+		private <T> Collection<T> getSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes, Object... args) {
+			ClassLoader classLoader = getClassLoader();
+			//获取key为ApplicationContextInitializer全类名的所有值，见下图2.2.1
+			Set<String> names = new LinkedHashSet<>(SpringFactoriesLoader.loadFactoryNames(type, classLoader));
+			//根据拿到的类名集合，使用反射创建对象放到集合中返回 见下图 2.2.2
+			List<T> instances = createSpringFactoriesInstances(type, parameterTypes, classLoader, args, names);
+			AnnotationAwareOrderComparator.sort(instances);
+			return instances;//返回到2 set
+		}
+
+
+	2.2.1
+
+	![](http://120.77.237.175:9080/photos/springboot/73.jpg)
+
+	上图`(List)loadSpringFactories(classLoader).getOrDefault(factoryTypeName, Collections.emptyList())`中调用重载的方法：
+
+		   //把类路径下所有META‐INF/spring.factories中的配置都存储起来，并返回，见下图
+		   (List)loadSpringFactories(classLoader)
+
+	![](http://120.77.237.175:9080/photos/springboot/74.jpg)
+
+	然后再调用**`getOrDefault(factoryTypeName, Collections.emptyList())`**方法，获取`key`为**`ApplicationContextInitializer`**类名的`value`集合
+
+	![](http://120.77.237.175:9080/photos/springboot/75.jpg)
+
+	2.2.2
+
+		private <T> List<T> createSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes,
+			ClassLoader classLoader, Object[] args, Set<String> names) {
+			List<T> instances = new ArrayList<>(names.size());
+			for (String name : names) {
+				try {
+					Class<?> instanceClass = ClassUtils.forName(name, classLoader);
+					Assert.isAssignable(type, instanceClass);
+					Constructor<?> constructor = instanceClass.getDeclaredConstructor(parameterTypes);
+					T instance = (T) BeanUtils.instantiateClass(constructor, args);
+					instances.add(instance);
+				}
+				catch (Throwable ex) {
+					throw new IllegalArgumentException("Cannot instantiate " + type + " : " + name, ex);
+				}
+			}
+			return instances;
+		}
+
+	![](http://120.77.237.175:9080/photos/springboot/76.jpg)
+
+3. 调用SpringApplication对象的run方法
+
+	![](http://120.77.237.175:9080/photos/springboot/77.png)
+
+		public ConfigurableApplicationContext run(String... args) {
+			StopWatch stopWatch = new StopWatch();
+			stopWatch.start();
+			 //声明IOC容器
+			ConfigurableApplicationContext context = null;
+			Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
+			configureHeadlessProperty();
+	       //从类路径下META‐INF/spring.factories获取SpringApplicationRunListeners，原理同2中获取ApplicationContextInitializer和ApplicationListener
+			SpringApplicationRunListeners listeners = getRunListeners(args);
+			//遍历上一步获取的所有SpringApplicationRunListener，调用其starting方法
+			listeners.starting();
+			try {
+				 //封装命令行
+				ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+				//准备环境，把上面获取到的listeners传过去，见3.1
+				ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
+				configureIgnoreBeanInfo(environment);
+				 //打印Banner，就是控制台那个Spring字符画
+				Banner printedBanner = printBanner(environment);
+				//根据当前环境利用反射创建IOC容器,见3.2
+				context = createApplicationContext();
+				//从类路径下META‐INF/spring.factories获取SpringBootExceptionReporter，原理同2中获取ApplicationContextInitializer和ApplicationListener
+				exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
+						new Class[] { ConfigurableApplicationContext.class }, context);
+				//准备IOC容器，见3.3
+				prepareContext(context, environment, listeners, applicationArguments, printedBanner);
+				//刷新IOC容器，可查看文章里嵌入式Servlet容器启动原理
+				refreshContext(context);
+				//这是一个空方法
+				afterRefresh(context, applicationArguments);
+				stopWatch.stop();
+				if (this.logStartupInfo) {
+					new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
+				}
+				//调用所有SpringApplicationRunListener的started方法
+				listeners.started(context);
+				 //见3.5 ，从ioc容器中获取所有的ApplicationRunner和CommandLineRunner进行回调ApplicationRunner先回调，再CommandLineRunner
+				callRunners(context, applicationArguments);
+			}
+			catch (Throwable ex) {
+				handleRunFailure(context, ex, exceptionReporters, listeners);
+				throw new IllegalStateException(ex);
+			}
+	
+			try {
+				//调用所有SpringApplicationRunListener的running方法
+				listeners.running(context);
+			}
+			catch (Throwable ex) {
+				handleRunFailure(context, ex, exceptionReporters, null);
+				throw new IllegalStateException(ex);
+			}
+			return context;
+		}
+
+	**容器创建完成，返回步骤1处，最后返回到启动类**
+	
+	3.1
+		
+		private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
+				ApplicationArguments applicationArguments) {
+			//获取或者创建环境，有则获取，无则创建
+			ConfigurableEnvironment environment = getOrCreateEnvironment();
+			//配置环境
+			configureEnvironment(environment, applicationArguments.getSourceArgs());
+			ConfigurationPropertySources.attach(environment);
+			//创建环境完成后，调用前面获取的所有SpringApplicationRunListener的environmentPrepared方法
+			listeners.environmentPrepared(environment);
+			bindToSpringApplication(environment);
+			if (!this.isCustomEnvironment) {
+				environment = new EnvironmentConverter(getClassLoader()).convertEnvironmentIfNecessary(environment,
+						deduceEnvironmentClass());
+			}
+			ConfigurationPropertySources.attach(environment);
+			//将创建好的environment返回
+			return environment;
+		}
+
+	3.2
+
+		protected ConfigurableApplicationContext createApplicationContext() {
+		Class<?> contextClass = this.applicationContextClass;
+			if (contextClass == null) {
+				try {
+					switch (this.webApplicationType) {
+					case SERVLET:
+						contextClass = Class.forName(DEFAULT_SERVLET_WEB_CONTEXT_CLASS);
+						break;
+					case REACTIVE:
+						contextClass = Class.forName(DEFAULT_REACTIVE_WEB_CONTEXT_CLASS);
+						break;
+					default:
+						contextClass = Class.forName(DEFAULT_CONTEXT_CLASS);
+					}
+				}
+				catch (ClassNotFoundException ex) {
+					throw new IllegalStateException(
+							"Unable create a default ApplicationContext, please specify an ApplicationContextClass", ex);
+				}
+			}
+			//将创建好的IOC容器返回
+			return (ConfigurableApplicationContext) BeanUtils.instantiateClass(contextClass);
+		}
+
+	3.3
+
+		private void prepareContext(ConfigurableApplicationContext context, ConfigurableEnvironment environment,
+				SpringApplicationRunListeners listeners, ApplicationArguments applicationArguments, Banner printedBanner) {
+			 //将创建好的环境放到IOC容器中
+			context.setEnvironment(environment);
+			//注册一些组件
+			postProcessApplicationContext(context);
+			/获取所有的ApplicationContextInitializer调用其initialize方法，这些ApplicationContextInitializer就是在2步骤中获取的，见3.3.1
+			applyInitializers(context);
+			//回调所有的SpringApplicationRunListener的contextPrepared方法，这些SpringApplicationRunListeners是在步骤3中获取的
+			listeners.contextPrepared(context);
+			//打印日志
+			if (this.logStartupInfo) {
+				logStartupInfo(context.getParent() == null);
+				logStartupProfileInfo(context);
+			}
+			// Add boot specific singleton beans
+			ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
+			beanFactory.registerSingleton("springApplicationArguments", applicationArguments);
+			if (printedBanner != null) {
+				beanFactory.registerSingleton("springBootBanner", printedBanner);
+			}
+			if (beanFactory instanceof DefaultListableBeanFactory) {
+				((DefaultListableBeanFactory) beanFactory)
+						.setAllowBeanDefinitionOverriding(this.allowBeanDefinitionOverriding);
+			}
+			if (this.lazyInitialization) {
+				context.addBeanFactoryPostProcessor(new LazyInitializationBeanFactoryPostProcessor());
+			}
+			// Load the sources
+			Set<Object> sources = getAllSources();
+			Assert.notEmpty(sources, "Sources must not be empty");
+			load(context, sources.toArray(new Object[0]));
+			//回调所有的SpringApplicationRunListener的contextLoaded方法
+			listeners.contextLoaded(context);
+		}
+
+	`prepareContext`方法运行完毕，返回到步骤3，执行`refreshContext`方法
+
+	3.3.1
+
+		protected void applyInitializers(ConfigurableApplicationContext context) {
+			for (ApplicationContextInitializer initializer : getInitializers()) {
+				Class<?> requiredType = GenericTypeResolver.resolveTypeArgument(initializer.getClass(),
+						ApplicationContextInitializer.class);
+				Assert.isInstanceOf(requiredType, context, "Unable to call initializer.");
+				initializer.initialize(context);
+			}
+		}
+
+	3.4
+
+		private void callRunners(ApplicationContext context, ApplicationArguments args) {
+			List<Object> runners = new ArrayList<>();
+			runners.addAll(context.getBeansOfType(ApplicationRunner.class).values());
+			runners.addAll(context.getBeansOfType(CommandLineRunner.class).values());
+			AnnotationAwareOrderComparator.sort(runners);
+			for (Object runner : new LinkedHashSet<>(runners)) {
+				if (runner instanceof ApplicationRunner) {
+					callRunner((ApplicationRunner) runner, args);
+				}
+				if (runner instanceof CommandLineRunner) {
+					callRunner((CommandLineRunner) runner, args);
+				}
+			}
+		}
+
+## 事件监听机制 ##
+
+1. 创建`ApplicationContextInitializer`和`SpringApplicationRunListener`的实现类
+
+		public class TestApplicationContextInitializer implements ApplicationContextInitializer {
+		    @Override
+		    public void initialize(ConfigurableApplicationContext configurableApplicationContext) {
+		        System.out.println("TestApplicationContextInitializer initialize..."+configurableApplicationContext);
+		    }
+		}
+
+	----
+
+		public class TestSpringApplicationRunListener implements SpringApplicationRunListener {
+	    @Override
+	    public void starting() {
+	        System.out.println("TestSpringApplicationRunListener starting...");
+	    }
+	
+	    @Override
+	    public void environmentPrepared(ConfigurableEnvironment environment) {
+	        System.out.println("TestSpringApplicationRunListener environmentPrepared...");
+	    }
+	
+	    @Override
+	    public void contextPrepared(ConfigurableApplicationContext context) {
+	        System.out.println("TestSpringApplicationRunListener contextPrepared...");
+	    }
+	
+	    @Override
+	    public void contextLoaded(ConfigurableApplicationContext context) {
+	        System.out.println("TestSpringApplicationRunListener contextLoaded...");
+	    }
+	
+	    @Override
+	    public void started(ConfigurableApplicationContext context) {
+	        System.out.println("TestSpringApplicationRunListener started...");
+	    }
+	
+	    @Override
+	    public void running(ConfigurableApplicationContext context) {
+	        System.out.println("TestSpringApplicationRunListener running...");
+	    }
+	
+	    @Override
+	    public void failed(ConfigurableApplicationContext context, Throwable exception) {
+	        System.out.println("TestSpringApplicationRunListener failed...");
+	    }
+	
+		}
+
+
+2. 在`META-INF/spring.factories`文件中配置
+
+		org.springframework.boot.SpringApplicationRunListener=\ com.springboot.starter.springbootstarter.listener.TestSpringApplicationRunListener
+		com.springboot.starter.springbootstarter.listener.TestSpringApplicationRunListener=\ com.springboot.starter.springbootstarter.listener.TestApplicationContextInitializer
+
+3. 创建`ApplicationRunner`实现类和`CommandLineRunner`实现类，注入到容器中
+
+		@Component
+		public class TestApplicationRunner implements ApplicationRunner {
+		    @Override
+		    public void run(ApplicationArguments args) throws Exception {
+		        System.out.println("TestApplicationRunner ..."+args);
+		    }
+		}
+
+	----
+
+		@Component
+		public class TestCommandLineRunner implements CommandLineRunner {
+		    @Override
+		    public void run(String... args) throws Exception {
+		        System.out.println("TestCommandLineRunner..."+ Arrays.asList(args));
+		    }
+		}
+
+**注意:启动时会报错,说是没有找到带`org.springframework.boot.SpringApplication`和`String`数组类型参数的构造器，给`TestSpringApplicationRunListener`添加这样的构造器**
+
+![](http://120.77.237.175:9080/photos/springboot/78.jpg)
+
+	//必须有的构造器
+	public TestSpringApplicationRunListener(SpringApplication application, String[] args) {
+    }
+![](http://120.77.237.175:9080/photos/springboot/79.jpg)
+
+# 自定义starter #
+
+- 启动器只用来做依赖导入
+- 专门来写一个自动配置模块；
+- 启动器依赖自动配置模块，项目中引入相应的starter就会引入启动器的所有传递依赖
+
+![](http://120.77.237.175:9080/photos/springboot/80.png)
+
+## 启动器 ##
+
+启动器模块是一个空 JAR 文件，仅提供辅助性依赖管理，这些依赖可能用于自动 装配或者其他类库
+
+### 命名 ###
+
+	模块名-spring-boot-starter
+
+### 如何编写自动配置 ###
+
+	@Configuration  //指定这个类是一个配置类
+	@ConditionalOnXXX  //在指定条件成立的情况下自动配置类生效
+	@AutoConfigureAfter  //指定自动配置类的顺序
+	@Bean  //给容器中添加组件
+	
+	@ConfigurationPropertie结合相关xxxProperties类来绑定相关的配置
+	@EnableConfigurationProperties //让xxxProperties生效加入到容器中
+	public class XxxxAutoConfiguration {
+		.....
+	}
+	
+自动配置类要能加载,将需要启动就加载的自动配置类，配置在**`META-INF/spring.factories`**
+
+	org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+	org.springframework.boot.autoconfigure.admin.SpringApplicationAdminJmxAutoConfiguration,\
+	org.springframework.boot.autoconfigure.aop.AopAutoConfiguration,\
+
+## 测试 ##
