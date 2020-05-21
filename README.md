@@ -4650,3 +4650,228 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 	org.springframework.boot.autoconfigure.aop.AopAutoConfiguration,\
 
 ## 测试 ##
+
+1. 创建一个自动配置模块，和创建普通`springboot`项目一样，不需要引入其他`starter(SpringBoot-Starter-Define-Configure)`
+
+		<?xml version="1.0" encoding="UTF-8"?>
+		<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+		    <modelVersion>4.0.0</modelVersion>
+		    <parent>
+		        <groupId>org.springframework.boot</groupId>
+		        <artifactId>spring-boot-starter-parent</artifactId>
+		        <version>2.2.5.RELEASE</version>
+		        <relativePath/> <!-- lookup parent from repository -->
+		    </parent>
+		    <groupId>com.springboot.starter.define.configure</groupId>
+		    <artifactId>springboot-starter-define-configure</artifactId>
+		    <version>0.0.1-SNAPSHOT</version>
+		    <name>springboot-starter-define-configure</name>
+		    <description>Demo project for Spring Boot</description>
+		    <packaging>jar</packaging>
+		
+		    <properties>
+		        <java.version>1.8</java.version>
+		    </properties>
+		
+		    <dependencies>
+		        <!--引入spring‐boot‐starter；所有starter的基本配置-->
+		        <dependency>
+		            <groupId>org.springframework.boot</groupId>
+		            <artifactId>spring-boot-starter</artifactId>
+		        </dependency>
+		
+		        <!--可以生成配置类提示文件-->
+		        <dependency>
+		            <groupId>org.springframework.boot</groupId>
+		            <artifactId>spring-boot-configuration-processor</artifactId>
+		            <optional>true</optional>
+		        </dependency>
+		    </dependencies>
+		
+		</project>
+
+2. 创建配置类和自动配置类
+
+		@ConfigurationProperties(prefix = "define.hello")
+		public class HelloProperties {
+		
+		    private String prefix;
+		    private String suffix;
+		
+		    public String getPrefix() {
+		        return prefix;
+		    }
+		
+		    public void setPrefix(String prefix) {
+		        this.prefix = prefix;
+		    }
+		
+		    public String getSuffix() {
+		        return suffix;
+		    }
+		
+		    public void setSuffix(String suffix) {
+		        this.suffix = suffix;
+		    }
+		}
+
+	----
+
+		public class HelloService {
+
+		    HelloProperties helloProperties;
+		
+		    public HelloProperties seHelloProperties(HelloProperties helloProperties){
+		        return this.helloProperties = helloProperties;
+		    }
+		
+		    public HelloProperties getHelloProperties()
+		    {
+		        return this.helloProperties;
+		    }
+		
+		    public String sayHello(String name)
+		    {
+		        return this.helloProperties.getPrefix() + " ---- " + name + "----"+ this.helloProperties.getSuffix();
+		    }
+		
+		}
+
+	---
+
+		@Configuration
+		@ConditionalOnWebApplication    //web应用才生效
+		@EnableConfigurationProperties(HelloProperties.class)   //让配置类生效，(注入到容器中)
+		public class SpringbootStarterDefineConfigureApplication {
+		
+		    @Autowired
+		    HelloProperties helloProperties;
+		
+		    @Bean
+		    public HelloService helloService()
+		    {
+		        HelloService helloService = new HelloService();
+		        helloService.seHelloProperties(helloProperties);
+		        return helloService;
+		    }
+		    
+		}
+
+3. 在`resources`文件夹下创建`META-INF/spring.factories`
+
+		org.springframework.boot.autoconfigure.EnableAutoConfiguration=\ com.springboot.starter.define.configure.SpringbootStarterDefineConfigureApplication
+
+4. 安装到本地仓库
+5. 创建starter，选择maven工程即可，只是用于管理依赖，添加对AutoConfiguration模块的依赖
+
+	![](http://120.77.237.175:9080/photos/springboot/81.jpg)
+
+		<?xml version="1.0" encoding="UTF-8"?>
+		<project xmlns="http://maven.apache.org/POM/4.0.0"
+		         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+		    <parent>
+		        <artifactId>SpringBoot</artifactId>
+		        <groupId>com.spring</groupId>
+		        <version>1.0-SNAPSHOT</version>
+		    </parent>
+		    <modelVersion>4.0.0</modelVersion>
+		
+		    <groupId>com.springboot.starter.define</groupId>
+		    <artifactId>springboot-starter-define</artifactId>
+		    <version>1.0-SNAPSHOT</version>
+		
+		    <dependencies>
+		        <dependency>
+		            <groupId>com.springboot.starter.define.configure</groupId>
+		            <artifactId>springboot-starter-define-configure</artifactId>
+		            <version>0.0.1-SNAPSHOT</version>
+		        </dependency>
+		    </dependencies>
+		
+		</project>
+
+6. 安装到本地仓库
+7. 在`SpringBoot-Starter`进行测试，必须要web场景，因为设置是web场景才生效
+
+		<?xml version="1.0" encoding="UTF-8"?>
+		<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+		    <modelVersion>4.0.0</modelVersion>
+		    <parent>
+		        <groupId>org.springframework.boot</groupId>
+		        <artifactId>spring-boot-starter-parent</artifactId>
+		        <version>2.2.7.RELEASE</version>
+		        <relativePath/> <!-- lookup parent from repository -->
+		    </parent>
+		    <groupId>com.springboot.starter</groupId>
+		    <artifactId>springboot-starter</artifactId>
+		    <version>0.0.1-SNAPSHOT</version>
+		    <name>springboot-starter</name>
+		    <description>Demo project for Spring Boot</description>
+		
+		    <properties>
+		        <java.version>1.8</java.version>
+		    </properties>
+		
+		    <dependencies>
+		        <dependency>
+		            <groupId>org.springframework.boot</groupId>
+		            <artifactId>spring-boot-starter-web</artifactId>
+		        </dependency>
+		
+		        <dependency>
+		            <groupId>org.springframework.boot</groupId>
+		            <artifactId>spring-boot-starter-test</artifactId>
+		            <scope>test</scope>
+		            <exclusions>
+		                <exclusion>
+		                    <groupId>org.junit.vintage</groupId>
+		                    <artifactId>junit-vintage-engine</artifactId>
+		                </exclusion>
+		            </exclusions>
+		        </dependency>
+		
+		        <dependency>
+		            <groupId>com.springboot.starter.define</groupId>
+		            <artifactId>springboot-starter-define</artifactId>
+		            <version>1.0-SNAPSHOT</version>
+		        </dependency>
+		    </dependencies>
+		
+		    <build>
+		        <plugins>
+		            <plugin>
+		                <groupId>org.springframework.boot</groupId>
+		                <artifactId>spring-boot-maven-plugin</artifactId>
+		            </plugin>
+		        </plugins>
+		    </build>
+		
+		</project>
+
+8. 创建`Controller`
+
+		@RestController
+		public class HelloController {
+		
+		    @Autowired
+		    HelloService helloService;
+		
+		    @GetMapping("/hello")
+		    public String Hello()
+		    {
+		        return helloService.sayHello("张三");
+		    }
+		}
+
+
+9. 在配置文件中配置
+
+	define.hello.prefix= 你好
+	define.hello.suffix= hello
+
+10. 启动项目访问`/hello`
+
+		你好 ---- 张三----hello

@@ -1,0 +1,4 @@
+com\springboot\starter\define\configure\starter\HelloProperties.class
+com\springboot\starter\define\configure\starter\HelloService.class
+com\springboot\starter\define\configure\SpringbootStarterDefineConfigureApplication.class
+META-INF\spring-configuration-metadata.json
