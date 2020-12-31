@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot.iml" filepath="$PROJECT_DIR$/SpringBoot.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Helloworld/SpringBoot-Helloworld.iml" filepath="$PROJECT_DIR$/SpringBoot-Helloworld/SpringBoot-Helloworld.iml" />
+      <module fileurl="file://$PROJECT_DIR$/springboot-annotation/springboot-annotation.iml" filepath="$PROJECT_DIR$/springboot-annotation/springboot-annotation.iml" />
+      <module fileurl="file://$PROJECT_DIR$/springboot-config/springboot-config.iml" filepath="$PROJECT_DIR$/springboot-config/springboot-config.iml" />
+      <module fileurl="file://$PROJECT_DIR$/springboot-config02/springboot-config02.iml" filepath="$PROJECT_DIR$/springboot-config02/springboot-config02.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Springboot-Data-JDBC/springboot-data-jdbc.iml" filepath="$PROJECT_DIR$/Springboot-Data-JDBC/springboot-data-jdbc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Data-JPA/springboot-data-jpa.iml" filepath="$PROJECT_DIR$/SpringBoot-Data-JPA/springboot-data-jpa.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Data-Mybatis/springboot-data-mybatis.iml" filepath="$PROJECT_DIR$/SpringBoot-Data-Mybatis/springboot-data-mybatis.iml" />
+      <module fileurl="file://$PROJECT_DIR$/springboot-helloworld-quick/springboot-helloworld-quick.iml" filepath="$PROJECT_DIR$/springboot-helloworld-quick/springboot-helloworld-quick.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Loggin/springboot-loggin.iml" filepath="$PROJECT_DIR$/SpringBoot-Loggin/springboot-loggin.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Starter/springboot-starter.iml" filepath="$PROJECT_DIR$/SpringBoot-Starter/springboot-starter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Starter-Define/springboot-starter-define.iml" filepath="$PROJECT_DIR$/SpringBoot-Starter-Define/springboot-starter-define.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Starter-Define-Configure/springboot-starter-define-configure.iml" filepath="$PROJECT_DIR$/SpringBoot-Starter-Define-Configure/springboot-starter-define-configure.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Web/springboot-web.iml" filepath="$PROJECT_DIR$/SpringBoot-Web/springboot-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Web-JSP/springboot-web-jsp.iml" filepath="$PROJECT_DIR$/SpringBoot-Web-JSP/springboot-web-jsp.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SpringBoot-Web-RestfulCRUD/springboot-web-restful.iml" filepath="$PROJECT_DIR$/SpringBoot-Web-RestfulCRUD/springboot-web-restful.iml" />
+    </modules>
+  </component>
+</project>

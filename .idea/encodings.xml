@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding" native2AsciiForPropertiesFiles="true" defaultCharsetForPropertiesFiles="UTF-8">
+    <file url="file://$PROJECT_DIR$/SpringBoot-Data-JPA/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/SpringBoot-Data-Mybatis/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/SpringBoot-Helloworld/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/SpringBoot-Loggin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/SpringBoot-Starter-Define-Configure/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/SpringBoot-Starter/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/SpringBoot-Web-JSP/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/SpringBoot-Web-RestfulCRUD/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/SpringBoot-Web/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Springboot-Data-JDBC/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/springboot-annotation/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/springboot-config/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/springboot-config02/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/springboot-helloworld-quick/src/main/java" charset="UTF-8" />
+    <file url="PROJECT" charset="UTF-8" />
+  </component>
+</project>

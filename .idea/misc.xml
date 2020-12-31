@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="FrameworkDetectionExcludesConfiguration">
+    <file type="web" url="file://$PROJECT_DIR$/SpringBoot-Web-JSP" />
+  </component>
+  <component name="MavenProjectsManager">
+    <option name="originalFiles">
+      <list>
+        <option value="$PROJECT_DIR$/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-Starter-Define-Configure/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-Starter/pom.xml" />
+        <option value="$PROJECT_DIR$/springboot-config/pom.xml" />
+        <option value="$PROJECT_DIR$/springboot-config02/pom.xml" />
+        <option value="$PROJECT_DIR$/Springboot-Data-JDBC/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-Data-JPA/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-Data-Mybatis/pom.xml" />
+        <option value="$PROJECT_DIR$/springboot-helloworld-quick/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-Loggin/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-Web/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-Web-JSP/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-Web-RestfulCRUD/pom.xml" />
+        <option value="$PROJECT_DIR$/springboot-annotation/pom.xml" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_1_8" project-jdk-name="1.8" project-jdk-type="JavaSDK" />
+</project>

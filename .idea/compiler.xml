@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="springboot-starter" />
+        <module name="springboot-web-jsp" />
+        <module name="springboot-starter-define-configure" />
+        <module name="springboot-loggin" />
+        <module name="springboot-data-jdbc" />
+        <module name="springboot-helloworld-quick" />
+        <module name="springboot-web-restful" />
+        <module name="springboot-starter-define" />
+        <module name="SpringBoot-Helloworld" />
+        <module name="springboot-data-jpa" />
+        <module name="springboot-web" />
+        <module name="springboot-config" />
+        <module name="springboot-annotation" />
+        <module name="springboot-config02" />
+        <module name="springboot-data-mybatis" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel target="8">
+      <module name="SpringBoot" target="1.8" />
+      <module name="springboot-annotation" target="1.8" />
+      <module name="springboot-config" target="1.8" />
+      <module name="springboot-config02" target="1.8" />
+      <module name="springboot-data-jdbc" target="1.8" />
+      <module name="springboot-data-jpa" target="1.8" />
+      <module name="springboot-data-mybatis" target="1.8" />
+      <module name="SpringBoot-Helloworld" target="1.8" />
+      <module name="springboot-helloworld-quick" target="1.8" />
+      <module name="springboot-loggin" target="1.8" />
+      <module name="springboot-starter" target="1.8" />
+      <module name="springboot-starter-define" target="1.8" />
+      <module name="springboot-starter-define-configure" target="1.8" />
+      <module name="springboot-web" target="1.8" />
+      <module name="springboot-web-jsp" target="1.8" />
+      <module name="springboot-web-restful" target="1.8" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="SpringBoot-Helloworld" options="-parameters" />
+      <module name="springboot-annotation" options="-parameters" />
+      <module name="springboot-config" options="-parameters" />
+      <module name="springboot-config02" options="-parameters" />
+      <module name="springboot-data-jdbc" options="-parameters" />
+      <module name="springboot-data-jpa" options="-parameters" />
+      <module name="springboot-data-mybatis" options="-parameters" />
+      <module name="springboot-helloworld-quick" options="-parameters" />
+      <module name="springboot-loggin" options="-parameters" />
+      <module name="springboot-starter" options="-parameters" />
+      <module name="springboot-starter-define" options="-parameters" />
+      <module name="springboot-starter-define-configure" options="-parameters" />
+      <module name="springboot-web" options="-parameters" />
+      <module name="springboot-web-jsp" options="-parameters" />
+      <module name="springboot-web-restful" options="-parameters" />
+    </option>
+  </component>
+</project>

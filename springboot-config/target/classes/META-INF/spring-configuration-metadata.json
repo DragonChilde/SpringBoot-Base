@@ -4,6 +4,11 @@
       "name": "person",
       "type": "com.springboot.config.springbootconfig.bean.Person",
       "sourceType": "com.springboot.config.springbootconfig.bean.Person"
+    },
+    {
+      "name": "user",
+      "type": "com.springboot.config.springbootconfig.bean.User",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
     }
   ],
   "properties": [
@@ -42,6 +47,56 @@
       "name": "person.name",
       "type": "java.lang.String",
       "sourceType": "com.springboot.config.springbootconfig.bean.Person"
+    },
+    {
+      "name": "user.age",
+      "type": "java.lang.Integer",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
+    },
+    {
+      "name": "user.all-pets",
+      "type": "java.util.Map<java.lang.String,java.util.List<com.springboot.config.springbootconfig.bean.Pet>>",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
+    },
+    {
+      "name": "user.animal",
+      "type": "java.util.List<java.lang.String>",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
+    },
+    {
+      "name": "user.birth",
+      "type": "java.util.Date",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
+    },
+    {
+      "name": "user.boss",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
+    },
+    {
+      "name": "user.interests",
+      "type": "java.lang.String[]",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
+    },
+    {
+      "name": "user.pet",
+      "type": "com.springboot.config.springbootconfig.bean.Pet",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
+    },
+    {
+      "name": "user.salarys",
+      "type": "java.util.Set<java.lang.Double>",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
+    },
+    {
+      "name": "user.score",
+      "type": "java.util.Map<java.lang.String,java.lang.Object>",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
+    },
+    {
+      "name": "user.user-name",
+      "type": "java.lang.String",
+      "sourceType": "com.springboot.config.springbootconfig.bean.User"
     }
   ],
   "hints": []
