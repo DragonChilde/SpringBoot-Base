@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/SpringBoot.iml" filepath="$PROJECT_DIR$/SpringBoot.iml" />
       <module fileurl="file://$PROJECT_DIR$/SpringBoot-Helloworld/SpringBoot-Helloworld.iml" filepath="$PROJECT_DIR$/SpringBoot-Helloworld/SpringBoot-Helloworld.iml" />
+      <module fileurl="file://$PROJECT_DIR$/springboot-Web02/springboot-Web02.iml" filepath="$PROJECT_DIR$/springboot-Web02/springboot-Web02.iml" />
       <module fileurl="file://$PROJECT_DIR$/springboot-annotation/springboot-annotation.iml" filepath="$PROJECT_DIR$/springboot-annotation/springboot-annotation.iml" />
       <module fileurl="file://$PROJECT_DIR$/springboot-config/springboot-config.iml" filepath="$PROJECT_DIR$/springboot-config/springboot-config.iml" />
       <module fileurl="file://$PROJECT_DIR$/springboot-config02/springboot-config02.iml" filepath="$PROJECT_DIR$/springboot-config02/springboot-config02.iml" />

@@ -22,6 +22,7 @@
         <module name="springboot-annotation" />
         <module name="springboot-config02" />
         <module name="springboot-data-mybatis" />
+        <module name="springboot-Web02" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="8">
@@ -41,11 +42,13 @@
       <module name="springboot-web" target="1.8" />
       <module name="springboot-web-jsp" target="1.8" />
       <module name="springboot-web-restful" target="1.8" />
+      <module name="springboot-Web02" target="1.8" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="SpringBoot-Helloworld" options="-parameters" />
+      <module name="springboot-Web02" options="-parameters" />
       <module name="springboot-annotation" options="-parameters" />
       <module name="springboot-config" options="-parameters" />
       <module name="springboot-config02" options="-parameters" />

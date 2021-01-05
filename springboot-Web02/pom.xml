@@ -8,10 +8,10 @@
         <version>2.3.7.RELEASE</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.springboot.web</groupId>
-    <artifactId>springboot-web</artifactId>
+    <groupId>com.sb</groupId>
+    <artifactId>web</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>springboot-web</name>
+    <name>web</name>
     <description>Demo project for Spring Boot</description>
 
     <properties>
@@ -35,20 +35,6 @@
                 </exclusion>
             </exclusions>
         </dependency>
-
-        <!--引入jquery-webjar-->
-        <dependency>
-            <groupId>org.webjars</groupId>
-            <artifactId>jquery</artifactId>
-            <version>3.5.0</version>
-        </dependency>
-
-        <!--引入thymeleaf模样-->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-thymeleaf</artifactId>
-        </dependency>
-
     </dependencies>
 
     <build>
