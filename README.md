@@ -2622,6 +2622,1133 @@ public class WebConfig
   }
 ```
 
+##### Servlet API
+
+```java
+WebRequest、ServletRequest、MultipartRequest、 HttpSession、javax.servlet.http.PushBuilder、Principal、InputStream、Reader、HttpMethod、Locale、TimeZone、ZoneId
+```
+
+```java
+//通过下面的参数处理原理分析,找到ServletRequestMethodArgumentResolver参数解析器支持处理以上参数
+public class ServletRequestMethodArgumentResolver implements HandlerMethodArgumentResolver {
+	...
+	@Override
+	public boolean supportsParameter(MethodParameter parameter) {
+		Class<?> paramType = parameter.getParameterType();
+		return (WebRequest.class.isAssignableFrom(paramType) ||
+				ServletRequest.class.isAssignableFrom(paramType) ||
+				MultipartRequest.class.isAssignableFrom(paramType) ||
+				HttpSession.class.isAssignableFrom(paramType) ||
+				(pushBuilder != null && pushBuilder.isAssignableFrom(paramType)) ||
+				Principal.class.isAssignableFrom(paramType) ||
+				InputStream.class.isAssignableFrom(paramType) ||
+				Reader.class.isAssignableFrom(paramType) ||
+				HttpMethod.class == paramType ||
+				Locale.class == paramType ||
+				TimeZone.class == paramType ||
+				ZoneId.class == paramType);
+	}
+	...
+}
+```
+
+##### 复杂参数
+
+```java
+Map、Model（map、model里面的数据会被放在request的请求域  request.setAttribute）、Errors/BindingResult、RedirectAttributes（ 重定向携带数据）、ServletResponse（response）、SessionStatus、UriComponentsBuilder、ServletUriComponentsBuilder
+```
+
+```java
+//Map 使用的是MapMethodProcessor解析器
+//Model 使用的是ModelMethodProcessor解析器
+//执行原理可参考下面的参数处理原理,同理
+//当执行到resolveArgument,使用参数处理器处理请求参数时,进去看执行方法
+try {
+				args[i] = this.resolvers.resolveArgument(parameter, mavContainer, request, this.dataBinderFactory);
+			}
+=====================================
+    
+    //可以看到这里使用mavContainer获取Model
+    //mavContainer使用的是ModelAndViewContainer.getModel()方法,如下
+    @Override
+	@Nullable
+	public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
+			NativeWebRequest webRequest, @Nullable WebDataBinderFactory binderFactory) throws Exception {
+
+		Assert.state(mavContainer != null, "ModelAndViewContainer is required for model exposure");
+		return mavContainer.getModel();
+	}
+
+======================================
+    //这里的defaultModel使用的是ModelAndViewContainer
+    //private final ModelMap defaultModel = new BindingAwareModelMap();
+    //从继承关系可以看到BindingAwareModelMap继承的是ModelMap
+    public ModelMap getModel() {
+		if (useDefaultModel()) {
+			return this.defaultModel;
+		}
+		else {
+			if (this.redirectModel == null) {
+				this.redirectModel = new ModelMap();
+			}
+			return this.redirectModel;
+		}
+	}
+```
+
+当Map和Model 两个类型的处理解析器都处理完参数后,我们可以看到返回给args里,两个参数都是绑定在`BindingAwareModelMap`的同一个容器里,都是11899(第一个参数是Map,第二个参数是Model)
+
+![](http://120.77.237.175:9080/photos/springboot/92.jpg)
+
+把参数都处理完,现在进入`ServletInvocableHandlerMethod.invokeAndHandle()`方法里可看到获取返回值是我们自定义的转发地址`forward:/success`,而处理参数都绑定在`mavContainer`里,
+
+![](http://120.77.237.175:9080/photos/springboot/93.jpg)
+
+```java
+//然后我们进入这里研究下如何处理返回值
+this.returnValueHandlers.handleReturnValue(
+					returnValue, getReturnValueType(returnValue), mavContainer, webRequest);
+
+====================================================
+    
+    @Override
+	public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
+			ModelAndViewContainer mavContainer, NativeWebRequest webRequest) throws Exception {
+
+		HandlerMethodReturnValueHandler handler = selectHandler(returnValue, returnType);
+		if (handler == null) {
+			throw new IllegalArgumentException("Unknown return value type: " + returnType.getParameterType().getName());
+		}
+		handler.handleReturnValue(returnValue, returnType, mavContainer, webRequest);
+	}
+
+========================================================
+    
+    //因为我们跳转的地址是当前链接,整个处理过程,就是处理视图模型
+    	@Override
+	public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
+			ModelAndViewContainer mavContainer, NativeWebRequest webRequest) throws Exception {
+
+		if (returnValue instanceof CharSequence) {
+			String viewName = returnValue.toString();
+			mavContainer.setViewName(viewName);		//设置视图名
+			if (isRedirectViewName(viewName)) {
+				mavContainer.setRedirectModelScenario(true);
+			}
+		}
+		else if (returnValue != null) {
+			// should not happen
+			throw new UnsupportedOperationException("Unexpected return type: " +
+					returnType.getParameterType().getName() + " in method: " + returnType.getMethod());
+		}
+	}
+```
+
+
+
+```java
+//返回到`RequestMappingHandlerAdapter.invokeHandlerMethod()里`
+//进入看执行过程
+return getModelAndView(mavContainer, modelFactory, webRequest);
+
+=====================
+    
+    @Nullable
+	private ModelAndView getModelAndView(ModelAndViewContainer mavContainer,
+			ModelFactory modelFactory, NativeWebRequest webRequest) throws Exception {
+
+		modelFactory.updateModel(webRequest, mavContainer);		//进入下面的源码,看如何处理更新Model
+		if (mavContainer.isRequestHandled()) {
+			return null;
+		}
+		ModelMap model = mavContainer.getModel();		//更Model后,又重新获取,把model又重新封装成ModelAndView
+		ModelAndView mav = new ModelAndView(mavContainer.getViewName(), model, mavContainer.getStatus());
+		if (!mavContainer.isViewReference()) {
+			mav.setView((View) mavContainer.getView());
+		}
+		if (model instanceof RedirectAttributes) {	//判断是否重定向,现在我们的请求是转发,因此为false,直接跳过
+			Map<String, ?> flashAttributes = ((RedirectAttributes) model).getFlashAttributes();
+			HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
+			if (request != null) {
+				RequestContextUtils.getOutputFlashMap(request).putAll(flashAttributes);
+			}
+		}
+		return mav;
+	}
+
+==================================================
+	//更新Model
+	public void updateModel(NativeWebRequest request, ModelAndViewContainer container) throws Exception {
+    //处理参数放到defaultModel
+		ModelMap defaultModel = container.getDefaultModel();
+		if (container.getSessionStatus().isComplete()){
+			this.sessionAttributesHandler.cleanupAttributes(request);
+		}
+		else {
+			this.sessionAttributesHandler.storeAttributes(request, defaultModel);
+		}
+		if (!container.isRequestHandled() && container.getModel() == defaultModel) {
+            
+			updateBindingResult(request, defaultModel);
+		}
+	}
+
+//绑定结果
+	private void updateBindingResult(NativeWebRequest request, ModelMap model) throws Exception {
+		List<String> keyNames = new ArrayList<>(model.keySet());
+		for (String name : keyNames) {
+			Object value = model.get(name);
+			if (value != null && isBindingCandidate(name, value)) {
+				String bindingResultKey = BindingResult.MODEL_KEY_PREFIX + name;
+				if (!model.containsAttribute(bindingResultKey)) {
+					WebDataBinder dataBinder = this.dataBinderFactory.createBinder(request, value, name);
+					model.put(bindingResultKey, dataBinder.getBindingResult());
+				}
+			}
+		}
+	}
+
+	/**
+	 * Whether the given attribute requires a {@link BindingResult} in the model.
+	 */
+	private boolean isBindingCandidate(String attributeName, Object value) {
+		if (attributeName.startsWith(BindingResult.MODEL_KEY_PREFIX)) {
+			return false;
+		}
+
+		if (this.sessionAttributesHandler.isHandlerSessionAttribute(attributeName, value.getClass())) {
+			return true;
+		}
+
+		return (!value.getClass().isArray() && !(value instanceof Collection) &&
+				!(value instanceof Map) && !BeanUtils.isSimpleValueType(value.getClass()));
+	}
+```
+
+目标方法执行完成,将所有的数据都放在 **ModelAndViewContainer**；包含要去的页面地址View。还包含Model数据。
+
+![](http://120.77.237.175:9080/photos/springboot/94.jpg)
+
+派发结果
+
+当上面的请求把Model获取完后,返回到`DispatcherServlet.doDispatch()里继续往下走`
+
+```java
+//进入下面
+processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+
+================================================================
+    //这里的mv参数,就是上面处理完model把我们的转发url,和参数封装到这里
+    	private void processDispatchResult(HttpServletRequest request, HttpServletResponse response,
+			@Nullable HandlerExecutionChain mappedHandler, @Nullable ModelAndView mv,
+			@Nullable Exception exception) throws Exception {
+
+		boolean errorView = false;
+
+		if (exception != null) {
+			if (exception instanceof ModelAndViewDefiningException) {
+				logger.debug("ModelAndViewDefiningException encountered", exception);
+				mv = ((ModelAndViewDefiningException) exception).getModelAndView();
+			}
+			else {
+				Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
+				mv = processHandlerException(request, response, handler, exception);
+				errorView = (mv != null);
+			}
+		}
+
+		// Did the handler return a view to render?
+		if (mv != null && !mv.wasCleared()) {
+			render(mv, request, response);	//进入这里,看要转发到哪个页面
+			if (errorView) {
+				WebUtils.clearErrorRequestAttributes(request);
+			}
+		}
+		else {
+			if (logger.isTraceEnabled()) {
+				logger.trace("No view rendering, null ModelAndView returned.");
+			}
+		}
+
+		if (WebAsyncUtils.getAsyncManager(request).isConcurrentHandlingStarted()) {
+			// Concurrent handling started during a forward
+			return;
+		}
+
+		if (mappedHandler != null) {
+			// Exception (if any) is already handled..
+			mappedHandler.triggerAfterCompletion(request, response, null);
+		}
+	}
+
+======================================================
+    	protected void render(ModelAndView mv, HttpServletRequest request, HttpServletResponse response) throws Exception {
+		// Determine locale for request and apply it to the response.
+		Locale locale =
+				(this.localeResolver != null ? this.localeResolver.resolveLocale(request) : request.getLocale());
+		response.setLocale(locale);
+
+		View view;
+		String viewName = mv.getViewName();	//获取视图名,现在DEBUG的viewName是转发forward:/success
+		if (viewName != null) {
+			// We need to resolve the view name.
+            //解析视图,mv.getModelInternal()是我们的参数
+            //"hello" -> "world666"
+			//"world" -> "hello666"
+			view = resolveViewName(viewName, mv.getModelInternal(), locale, request);	//进入这里,看如何解析
+			if (view == null) {
+				throw new ServletException("Could not resolve view with name '" + mv.getViewName() +
+						"' in servlet with name '" + getServletName() + "'");
+			}
+		}
+		else {
+			// No need to lookup: the ModelAndView object contains the actual View object.
+			view = mv.getView();
+			if (view == null) {
+				throw new ServletException("ModelAndView [" + mv + "] neither contains a view name nor a " +
+						"View object in servlet with name '" + getServletName() + "'");
+			}
+		}
+
+		// Delegate to the View object for rendering.
+		if (logger.isTraceEnabled()) {
+			logger.trace("Rendering view [" + view + "] ");
+		}
+		try {
+			if (mv.getStatus() != null) {
+				response.setStatus(mv.getStatus().value());
+			}
+			view.render(mv.getModelInternal(), request, response);		//关键这里,继续进入
+		}
+		catch (Exception ex) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Error rendering view [" + view + "]", ex);
+			}
+			throw ex;
+		}
+	}
+
+================================================
+    @Nullable
+	protected View resolveViewName(String viewName, @Nullable Map<String, Object> model,
+			Locale locale, HttpServletRequest request) throws Exception {
+
+		if (this.viewResolvers != null) {
+			for (ViewResolver viewResolver : this.viewResolvers) {
+                //继续进入这里,看如何解析
+				View view = viewResolver.resolveViewName(viewName, locale);
+				if (view != null) {
+					return view;
+				}
+			}
+		}
+		return null;
+	}
+================================================================================
+    @Override
+	@Nullable
+	public View resolveViewName(String viewName, Locale locale) throws Exception {
+		RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+		Assert.state(attrs instanceof ServletRequestAttributes, "No current ServletRequestAttributes");
+		List<MediaType> requestedMediaTypes = getMediaTypes(((ServletRequestAttributes) attrs).getRequest());
+		if (requestedMediaTypes != null) {
+			List<View> candidateViews = getCandidateViews(viewName, locale, requestedMediaTypes);
+			View bestView = getBestView(candidateViews, requestedMediaTypes, attrs);
+			if (bestView != null) {
+				return bestView;
+			}
+		}
+
+		String mediaTypeInfo = logger.isDebugEnabled() && requestedMediaTypes != null ?
+				" given " + requestedMediaTypes.toString() : "";
+
+		if (this.useNotAcceptableStatusCode) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Using 406 NOT_ACCEPTABLE" + mediaTypeInfo);
+			}
+			return NOT_ACCEPTABLE_VIEW;
+		}
+		else {
+			logger.debug("View remains unresolved" + mediaTypeInfo);
+			return null;
+		}
+	}
+```
+
+```java
+//model封装了我们的参数	 "hello" -> "world666""world" -> "hello666"
+@Override
+	public void render(@Nullable Map<String, ?> model, HttpServletRequest request,
+			HttpServletResponse response) throws Exception {
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("View " + formatViewName() +
+					", model " + (model != null ? model : Collections.emptyMap()) +
+					(this.staticAttributes.isEmpty() ? "" : ", static attributes " + this.staticAttributes));
+		}
+
+        //把我们的参数和,所有的请求,返回进行合并,继续进入研究
+		Map<String, Object> mergedModel = createMergedOutputModel(model, request, response);
+		prepareResponse(request, response);
+        //渲染合并输出数据,进入继续研究,mergedModel是上面转成LinkHashMap传入
+		renderMergedOutputModel(mergedModel, getRequestToExpose(request), response);
+	}
+
+===========================================
+    	protected Map<String, Object> createMergedOutputModel(@Nullable Map<String, ?> model,
+			HttpServletRequest request, HttpServletResponse response) {
+
+		@SuppressWarnings("unchecked")
+		Map<String, Object> pathVars = (this.exposePathVariables ?
+				(Map<String, Object>) request.getAttribute(View.PATH_VARIABLES) : null);
+
+		// Consolidate static and dynamic model attributes.
+		int size = this.staticAttributes.size();
+		size += (model != null ? model.size() : 0);
+		size += (pathVars != null ? pathVars.size() : 0);
+
+		Map<String, Object> mergedModel = new LinkedHashMap<>(size);
+		mergedModel.putAll(this.staticAttributes);
+		if (pathVars != null) {
+			mergedModel.putAll(pathVars);
+		}
+		if (model != null) {	//model现在不会空,把我们的参数转为LinkedHashMap
+			mergedModel.putAll(model);
+		}
+
+		// Expose RequestContext?
+		if (this.requestContextAttribute != null) {
+			mergedModel.put(this.requestContextAttribute, createRequestContext(request, response, mergedModel));
+		}
+
+		return mergedModel;		//返回LinkedHashMap
+	}
+
+===========================================================================================
+    //暴露模型作为请求域属性
+    @Override
+	protected void renderMergedOutputModel(
+			Map<String, Object> model, HttpServletRequest request, HttpServletResponse response) throws Exception {
+
+		// 进入这里,继续研究
+		exposeModelAsRequestAttributes(model, request);
+
+		// Expose helpers as request attributes, if any.
+		exposeHelpers(request);
+
+		// Determine the path for the request dispatcher.
+		String dispatcherPath = prepareForRendering(request, response);
+
+		// Obtain a RequestDispatcher for the target resource (typically a JSP).
+		RequestDispatcher rd = getRequestDispatcher(request, dispatcherPath);
+		if (rd == null) {
+			throw new ServletException("Could not get RequestDispatcher for [" + getUrl() +
+					"]: Check that the corresponding file exists within your web application archive!");
+		}
+
+		// If already included or response already committed, perform include, else forward.
+		if (useInclude(request, response)) {
+			response.setContentType(getContentType());
+			if (logger.isDebugEnabled()) {
+				logger.debug("Including [" + getUrl() + "]");
+			}
+			rd.include(request, response);
+		}
+
+		else {
+			// Note: The forwarded resource is supposed to determine the content type itself.
+			if (logger.isDebugEnabled()) {
+				logger.debug("Forwarding to [" + getUrl() + "]");
+			}
+			rd.forward(request, response);
+		}
+	}
+
+===============================================
+    //至此,整个跟踪流程,处理我们的参数model,就是一个遍历setAttribute赋值,model中的所有数据遍历挨个放在请求域中
+    protected void exposeModelAsRequestAttributes(Map<String, Object> model,
+			HttpServletRequest request) throws Exception {
+
+		model.forEach((name, value) -> {
+			if (value != null) {
+				request.setAttribute(name, value);
+			}
+			else {
+				request.removeAttribute(name);
+			}
+		});
+	}
+```
+
+
+
+#### POJO封装原理
+
+继承按下面的处理原理先进入`ServletInvocableHandlerMethod.invokeAndHandle()`
+
+```java
+Object returnValue = invokeForRequest(webRequest, mavContainer, providedArgs);
+
+====================================
+//参数的值此,可以看到我们当前请求的参数类型和返回类型都是class com.sb.web.bean.Person
+	@Nullable
+	public Object invokeForRequest(NativeWebRequest request, @Nullable ModelAndViewContainer mavContainer,
+			Object... providedArgs) throws Exception {
+
+		Object[] args = getMethodArgumentValues(request, mavContainer, providedArgs);
+		if (logger.isTraceEnabled()) {
+			logger.trace("Arguments: " + Arrays.toString(args));
+		}
+		return doInvoke(args);
+	}
+
+=================================================
+    	protected Object[] getMethodArgumentValues(NativeWebRequest request, @Nullable ModelAndViewContainer mavContainer,
+			Object... providedArgs) throws Exception {
+
+		MethodParameter[] parameters = getMethodParameters();
+		if (ObjectUtils.isEmpty(parameters)) {
+			return EMPTY_ARGS;
+		}
+
+		Object[] args = new Object[parameters.length];
+		for (int i = 0; i < parameters.length; i++) {
+			MethodParameter parameter = parameters[i];
+			parameter.initParameterNameDiscovery(this.parameterNameDiscoverer);
+			args[i] = findProvidedArgument(parameter, providedArgs);
+			if (args[i] != null) {
+				continue;
+			}
+            //根据下面的参数处理原理,可知从16个参数解析器中遍历查找可供使用的解析器
+            //找到的当前的POJO参数解析器是ServletModelAttributeMethodProcessor,进入研究为何是这个解析器
+			if (!this.resolvers.supportsParameter(parameter)) {
+				throw new IllegalStateException(formatArgumentError(parameter, "No suitable resolver"));
+			}
+			try {
+                //获取到对应的参数解析器,进入看如何处理参数
+				args[i] = this.resolvers.resolveArgument(parameter, mavContainer, request, this.dataBinderFactory);
+			}
+			catch (Exception ex) {
+				// Leave stack trace for later, exception may actually be resolved and handled...
+				if (logger.isDebugEnabled()) {
+					String exMsg = ex.getMessage();
+					if (exMsg != null && !exMsg.contains(parameter.getExecutable().toGenericString())) {
+						logger.debug(formatArgumentError(parameter, exMsg));
+					}
+				}
+				throw ex;
+			}
+		}
+		return args;
+	}
+
+==========================================================================
+    	@Override
+	public boolean supportsParameter(MethodParameter parameter) {
+    //判断是否使用了ModelAttribute注解,我们当前没有使用,为false,同时判断是否解单属性,不是,也是false,
+    //最后结果是非false,返回true
+		return (parameter.hasParameterAnnotation(ModelAttribute.class) ||
+				(this.annotationNotRequired && !BeanUtils.isSimpleProperty(parameter.getParameterType())));
+	}
+
+===========================================
+    //简单属性判断
+	public static boolean isSimpleProperty(Class<?> type) {
+		Assert.notNull(type, "'type' must not be null");
+		return isSimpleValueType(type) || (type.isArray() && isSimpleValueType(type.getComponentType()));
+	}
+
+    //上面的简单属性类型判断如下
+    	public static boolean isSimpleValueType(Class<?> type) {
+		return (Void.class != type && void.class != type &&
+				(ClassUtils.isPrimitiveOrWrapper(type) ||
+				Enum.class.isAssignableFrom(type) ||
+				CharSequence.class.isAssignableFrom(type) ||
+				Number.class.isAssignableFrom(type) ||
+				Date.class.isAssignableFrom(type) ||
+				Temporal.class.isAssignableFrom(type) ||
+				URI.class == type ||
+				URL.class == type ||
+				Locale.class == type ||
+				Class.class == type));
+	}
+```
+
+
+
+```java
+//进入参数处理器,研究如何处理参数
+@Override
+@Nullable
+public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
+      NativeWebRequest webRequest, @Nullable WebDataBinderFactory binderFactory) throws Exception {
+
+   HandlerMethodArgumentResolver resolver = getArgumentResolver(parameter);
+   if (resolver == null) {
+      throw new IllegalArgumentException("Unsupported parameter type [" +
+            parameter.getParameterType().getName() + "]. supportsParameter should be called first.");
+   }
+    //继续进入
+   return resolver.resolveArgument(parameter, mavContainer, webRequest, binderFactory);
+}
+
+============================================================================================================
+	@Override
+	@Nullable
+	public final Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
+			NativeWebRequest webRequest, @Nullable WebDataBinderFactory binderFactory) throws Exception {
+
+		Assert.state(mavContainer != null, "ModelAttributeMethodProcessor requires ModelAndViewContainer");
+		Assert.state(binderFactory != null, "ModelAttributeMethodProcessor requires WebDataBinderFactory");
+
+		String name = ModelFactory.getNameForParameter(parameter);
+		ModelAttribute ann = parameter.getParameterAnnotation(ModelAttribute.class);
+		if (ann != null) {
+			mavContainer.setBinding(name, ann.binding());
+		}
+
+		Object attribute = null;
+		BindingResult bindingResult = null;
+
+		if (mavContainer.containsAttribute(name)) {
+			attribute = mavContainer.getModel().get(name);
+		}
+    //当前attribute为Null
+		else {
+			// Create attribute instance
+			try {
+                //创建一个空的Person对象,可进去看下
+				attribute = createAttribute(name, parameter, binderFactory, webRequest);
+			}
+			catch (BindException ex) {
+				if (isBindExceptionRequired(parameter)) {
+					// No BindingResult parameter -> fail with BindException
+					throw ex;
+				}
+				// Otherwise, expose null/empty value and associated BindingResult
+				if (parameter.getParameterType() == Optional.class) {
+					attribute = Optional.empty();
+				}
+				bindingResult = ex.getBindingResult();
+			}
+		}
+
+    //现在bindingResult为Null进入判断
+		if (bindingResult == null) {
+			//把空的Person对象和所有的请求参数都放进去进行绑定
+            //WebDataBinder:web数据绑定器,将请求参数的值绑定到指定的JavaBean里面
+            //bind里的属性如下图
+			WebDataBinder binder = binderFactory.createBinder(webRequest, attribute, name);
+			if (binder.getTarget() != null) {
+				if (!mavContainer.isBindingDisabled(name)) {
+                    //重点:进入这里看如何绑定参数
+					bindRequestParameters(binder, webRequest);
+				}
+				validateIfApplicable(binder, parameter);
+				if (binder.getBindingResult().hasErrors() && isBindExceptionRequired(binder, parameter)) {
+					throw new BindException(binder.getBindingResult());
+				}
+			}
+			// Value type adaptation, also covering java.util.Optional
+			if (!parameter.getParameterType().isInstance(attribute)) {
+				attribute = binder.convertIfNecessary(binder.getTarget(), parameter.getParameterType(), parameter);
+			}
+			bindingResult = binder.getBindingResult();
+		}
+
+		// Add resolved attribute and BindingResult at the end of the model
+		Map<String, Object> bindingResultModel = bindingResult.getModel();
+		mavContainer.removeAttributes(bindingResultModel);
+		mavContainer.addAllAttributes(bindingResultModel);
+
+		return attribute;
+	}
+
+=========================================================
+  //把我们下面获取到的binder和所有请求传进来进行绑琮
+	@Override
+	protected void bindRequestParameters(WebDataBinder binder, NativeWebRequest request) {
+		ServletRequest servletRequest = request.getNativeRequest(ServletRequest.class);
+		Assert.state(servletRequest != null, "No ServletRequest");
+		ServletRequestDataBinder servletBinder = (ServletRequestDataBinder) binder;
+    //继续进入
+		servletBinder.bind(servletRequest);
+	}
+=========================================================
+    public void bind(ServletRequest request) {
+    //mpvs是我们传过来的所有值,如下图
+		MutablePropertyValues mpvs = new ServletRequestParameterPropertyValues(request);
+		MultipartRequest multipartRequest = WebUtils.getNativeRequest(request, MultipartRequest.class);
+		if (multipartRequest != null) {
+			bindMultipart(multipartRequest.getMultiFileMap(), mpvs);
+		}
+		addBindValues(mpvs, request);
+    //继续进入看如何绑定所有的属性值
+		doBind(mpvs);
+	}
+====================================================
+    	@Override
+	protected void doBind(MutablePropertyValues mpvs) {
+		checkFieldDefaults(mpvs);
+		checkFieldMarkers(mpvs);
+    //继续进入研究如何绑定
+		super.doBind(mpvs);
+	}
+
+===================================================================
+    protected void doBind(MutablePropertyValues mpvs) {
+		checkAllowedFields(mpvs);
+		checkRequiredFields(mpvs);
+    //继续进入研究如何绑定
+		applyPropertyValues(mpvs);
+	}
+
+=============================================================================
+    protected void applyPropertyValues(MutablePropertyValues mpvs) {
+		try {
+			//继续进入看如何绑定
+			getPropertyAccessor().setPropertyValues(mpvs, isIgnoreUnknownFields(), isIgnoreInvalidFields());
+		}
+		catch (PropertyBatchUpdateException ex) {
+			// Use bind error processor to create FieldErrors.
+			for (PropertyAccessException pae : ex.getPropertyAccessExceptions()) {
+				getBindingErrorProcessor().processPropertyAccessException(pae, getInternalBindingResult());
+			}
+		}
+	}
+
+======================================================================
+    	@Override
+	public void setPropertyValues(PropertyValues pvs, boolean ignoreUnknown, boolean ignoreInvalid)
+			throws BeansException {
+
+		List<PropertyAccessException> propertyAccessExceptions = null;
+		List<PropertyValue> propertyValues = (pvs instanceof MutablePropertyValues ?
+				((MutablePropertyValues) pvs).getPropertyValueList() : Arrays.asList(pvs.getPropertyValues()));
+
+		if (ignoreUnknown) {
+			this.suppressNotWritablePropertyException = true;
+		}
+		try {
+            //遍历所有的请求参数
+			for (PropertyValue pv : propertyValues) {
+				// setPropertyValue may throw any BeansException, which won't be caught
+				// here, if there is a critical failure such as no matching field.
+				// We can attempt to deal only with less serious exceptions.
+				try {
+                    //继承进入,看获取到请求参数如何绑定
+					setPropertyValue(pv);
+				}
+				catch (NotWritablePropertyException ex) {
+					if (!ignoreUnknown) {
+						throw ex;
+					}
+					// Otherwise, just ignore it and continue...
+				}
+				catch (NullValueInNestedPathException ex) {
+					if (!ignoreInvalid) {
+						throw ex;
+					}
+					// Otherwise, just ignore it and continue...
+				}
+				catch (PropertyAccessException ex) {
+					if (propertyAccessExceptions == null) {
+						propertyAccessExceptions = new ArrayList<>();
+					}
+					propertyAccessExceptions.add(ex);
+				}
+			}
+		}
+		finally {
+			if (ignoreUnknown) {
+				this.suppressNotWritablePropertyException = false;
+			}
+		}
+
+		// If we encountered individual exceptions, throw the composite exception.
+		if (propertyAccessExceptions != null) {
+			PropertyAccessException[] paeArray = propertyAccessExceptions.toArray(new PropertyAccessException[0]);
+			throw new PropertyBatchUpdateException(paeArray);
+		}
+	}
+
+===========================================================================
+    	@Override
+	public void setPropertyValue(PropertyValue pv) throws BeansException {
+		PropertyTokenHolder tokens = (PropertyTokenHolder) pv.resolvedTokens;
+		if (tokens == null) {
+			String propertyName = pv.getName();
+			AbstractNestablePropertyAccessor nestedPa;
+			try {
+                //这是一个反射器,获取到对应的BeanWrapper(org.springframework.beans.BeanWrapperImpl: wrapping object [com.sb.web.bean.Person@16789c5])
+				nestedPa = getPropertyAccessorForPropertyPath(propertyName);
+			}
+			catch (NotReadablePropertyException ex) {
+				throw new NotWritablePropertyException(getRootClass(), this.nestedPath + propertyName,
+						"Nested property in path '" + propertyName + "' does not exist", ex);
+			}
+			tokens = getPropertyNameTokens(getFinalPath(nestedPa, propertyName));
+			if (nestedPa == this) {
+				pv.getOriginalPropertyValue().resolvedTokens = tokens;
+			}
+            //继续进入这里
+			nestedPa.setPropertyValue(tokens, pv);
+		}
+		else {
+			setPropertyValue(tokens, pv);
+		}
+	}
+
+============================================================
+    protected void setPropertyValue(PropertyTokenHolder tokens, PropertyValue pv) throws BeansException {
+		if (tokens.keys != null) {
+			processKeyedProperty(tokens, pv);
+		}
+		else {
+            //继续进入
+			processLocalProperty(tokens, pv);
+		}
+	}
+
+===========================================================================================================
+    	private void processLocalProperty(PropertyTokenHolder tokens, PropertyValue pv) {
+		PropertyHandler ph = getLocalPropertyHandler(tokens.actualName);
+		if (ph == null || !ph.isWritable()) {
+			if (pv.isOptional()) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("Ignoring optional value for property '" + tokens.actualName +
+							"' - property not found on bean class [" + getRootClass().getName() + "]");
+				}
+				return;
+			}
+			if (this.suppressNotWritablePropertyException) {
+				// Optimization for common ignoreUnknown=true scenario since the
+				// exception would be caught and swallowed higher up anyway...
+				return;
+			}
+			throw createNotWritablePropertyException(tokens.canonicalName);
+		}
+
+		Object oldValue = null;
+		try {
+            //获取到原始值,18
+			Object originalValue = pv.getValue();
+			Object valueToApply = originalValue;
+			if (!Boolean.FALSE.equals(pv.conversionNecessary)) {
+				if (pv.isConverted()) {
+					valueToApply = pv.getConvertedValue();
+				}
+				else {
+					if (isExtractOldValueForEditor() && ph.isReadable()) {
+						try {
+							oldValue = ph.getValue();
+						}
+						catch (Exception ex) {
+							if (ex instanceof PrivilegedActionException) {
+								ex = ((PrivilegedActionException) ex).getException();
+							}
+							if (logger.isDebugEnabled()) {
+								logger.debug("Could not read previous value of property '" +
+										this.nestedPath + tokens.canonicalName + "'", ex);
+							}
+						}
+					}
+                    //重点:这里,进入看如何转换参数,现在传的18是字符串,如何转换成Integer
+					valueToApply = convertForProperty(
+							tokens.canonicalName, oldValue, originalValue, ph.toTypeDescriptor());
+				}
+                //至此,请求的参数已经转换成功valueToApply已经是Integer 18
+				pv.getOriginalPropertyValue().conversionNecessary = (valueToApply != originalValue);
+			}
+			ph.setValue(valueToApply);
+		}
+		catch (TypeMismatchException ex) {
+			throw ex;
+		}
+		catch (InvocationTargetException ex) {
+			PropertyChangeEvent propertyChangeEvent = new PropertyChangeEvent(
+					getRootInstance(), this.nestedPath + tokens.canonicalName, oldValue, pv.getValue());
+			if (ex.getTargetException() instanceof ClassCastException) {
+				throw new TypeMismatchException(propertyChangeEvent, ph.getPropertyType(), ex.getTargetException());
+			}
+			else {
+				Throwable cause = ex.getTargetException();
+				if (cause instanceof UndeclaredThrowableException) {
+					// May happen e.g. with Groovy-generated methods
+					cause = cause.getCause();
+				}
+				throw new MethodInvocationException(propertyChangeEvent, cause);
+			}
+		}
+		catch (Exception ex) {
+			PropertyChangeEvent pce = new PropertyChangeEvent(
+					getRootInstance(), this.nestedPath + tokens.canonicalName, oldValue, pv.getValue());
+			throw new MethodInvocationException(pce, ex);
+		}
+	}
+
+=======================================================================================================
+    	@Nullable
+	protected Object convertForProperty(
+			String propertyName, @Nullable Object oldValue, @Nullable Object newValue, TypeDescriptor td)
+			throws TypeMismatchException {
+
+		return convertIfNecessary(propertyName, oldValue, newValue, td.getType(), td);
+	}
+
+=====================================================================
+    	@Nullable
+	private Object convertIfNecessary(@Nullable String propertyName, @Nullable Object oldValue,
+			@Nullable Object newValue, @Nullable Class<?> requiredType, @Nullable TypeDescriptor td)
+			throws TypeMismatchException {
+
+		Assert.state(this.typeConverterDelegate != null, "No TypeConverterDelegate");
+		try {
+            //继续进入
+			return this.typeConverterDelegate.convertIfNecessary(propertyName, oldValue, newValue, requiredType, td);
+		}
+		catch (ConverterNotFoundException | IllegalStateException ex) {
+			PropertyChangeEvent pce =
+					new PropertyChangeEvent(getRootInstance(), this.nestedPath + propertyName, oldValue, newValue);
+			throw new ConversionNotSupportedException(pce, requiredType, ex);
+		}
+		catch (ConversionException | IllegalArgumentException ex) {
+			PropertyChangeEvent pce =
+					new PropertyChangeEvent(getRootInstance(), this.nestedPath + propertyName, oldValue, newValue);
+			throw new TypeMismatchException(pce, requiredType, ex);
+		}
+	}
+
+================================================================
+   //进入后可以看以下这方法是如何转换的
+    if (editor == null && conversionService != null && newValue != null && typeDescriptor != null) {
+			TypeDescriptor sourceTypeDesc = TypeDescriptor.forObject(newValue);
+        	//判断是否可以转换,寻找转换器,寻找成功,进行转换,继续进入源码
+			if (conversionService.canConvert(sourceTypeDesc, typeDescriptor)) {
+				try {
+                    //进行转换,进入研究
+					return (T) conversionService.convert(newValue, sourceTypeDesc, typeDescriptor);
+				}
+				catch (ConversionFailedException ex) {
+					// fallback to default conversion logic below
+					conversionAttemptEx = ex;
+				}
+			}
+		}
+
+========================================================
+   @Override
+	public boolean canConvert(@Nullable TypeDescriptor sourceType, TypeDescriptor targetType) {
+		Assert.notNull(targetType, "Target type to convert to cannot be null");
+		if (sourceType == null) {
+			return true;
+		}
+    //获取转换器,这里继续进入
+		GenericConverter converter = getConverter(sourceType, targetType);
+		return (converter != null);
+	}
+
+====================================================================
+    	protected GenericConverter getConverter(TypeDescriptor sourceType, TypeDescriptor targetType) {
+		ConverterCacheKey key = new ConverterCacheKey(sourceType, targetType);
+		GenericConverter converter = this.converterCache.get(key);
+		if (converter != null) {
+			return (converter != NO_MATCH ? converter : null);
+		}
+
+   		//进入这里
+		converter = this.converters.find(sourceType, targetType);
+		if (converter == null) {
+			converter = getDefaultConverter(sourceType, targetType);
+		}
+
+    //第一次加载转换器没有,为NULL,第二次加载就可以直接在缓存里获取
+		if (converter != null) {
+			this.converterCache.put(key, converter);
+			return converter;
+		}
+
+		this.converterCache.put(key, NO_MATCH);
+		return null;
+	}
+
+======================================================
+    
+    //很明显,也是一个增强的for循环,跟之前的参数解析器的逻辑一样,从124个转换器中寻找可以使用的转换器,返回
+    //在设置每一个值的时候，找它里面的所有converter那个可以将这个数据类型（request带来参数的字符串）转换到指定的类型（JavaBean -- Integer）byte -- > file
+    	@Nullable
+		public GenericConverter find(TypeDescriptor sourceType, TypeDescriptor targetType) {
+			// Search the full type hierarchy
+			List<Class<?>> sourceCandidates = getClassHierarchy(sourceType.getType());
+			List<Class<?>> targetCandidates = getClassHierarchy(targetType.getType());
+			for (Class<?> sourceCandidate : sourceCandidates) {
+				for (Class<?> targetCandidate : targetCandidates) {
+					ConvertiblePair convertiblePair = new ConvertiblePair(sourceCandidate, targetCandidate);
+					GenericConverter converter = getRegisteredConverter(sourceType, targetType, convertiblePair);
+					if (converter != null) {
+						return converter;
+					}
+				}
+			}
+			return null;
+		}
+
+=========================================================================
+    //这个是转换方法,当上面成功找到适合的转换器后进行参数转换
+   @Override
+	@Nullable
+	public Object convert(@Nullable Object source, @Nullable TypeDescriptor sourceType, TypeDescriptor targetType) {
+		Assert.notNull(targetType, "Target type to convert to cannot be null");
+		if (sourceType == null) {
+			Assert.isTrue(source == null, "Source must be [null] if source type == [null]");
+			return handleResult(null, targetType, convertNullSource(null, targetType));
+		}
+		if (source != null && !sourceType.getObjectType().isInstance(source)) {
+			throw new IllegalArgumentException("Source to convert from must be an instance of [" +
+					sourceType + "]; instead it was a [" + source.getClass().getName() + "]");
+		}
+    //进入这里看如何把sourceType:java.lang.String转成targetType:java.lang.Integer
+		GenericConverter converter = getConverter(sourceType, targetType);
+		if (converter != null) {
+            //利用反射进行转换,继续进入看如何转 
+			Object result = ConversionUtils.invokeConverter(converter, source, sourceType, targetType);
+			return handleResult(sourceType, targetType, result);
+		}
+		return handleConverterNotFound(source, sourceType, targetType);
+}
+
+================================================
+    
+    	@Nullable
+	public static Object invokeConverter(GenericConverter converter, @Nullable Object source,
+			TypeDescriptor sourceType, TypeDescriptor targetType) {
+
+		try {
+            //继续进入
+			return converter.convert(source, sourceType, targetType);
+		}
+		catch (ConversionFailedException ex) {
+			throw ex;
+		}
+		catch (Throwable ex) {
+			throw new ConversionFailedException(sourceType, targetType, source, ex);
+		}
+	}
+
+=====================================================
+    		@Override
+		@Nullable
+		public Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
+			if (source == null) {
+				return convertNullSource(sourceType, targetType);
+			}
+    		//工帮模式,获取对应的Converter进行转换,继续进入
+			return this.converterFactory.getConverter(targetType.getObjectType()).convert(source);
+		}
+
+================================================
+    
+final class StringToNumberConverterFactory implements ConverterFactory<String, Number> {
+
+	@Override
+	public <T extends Number> Converter<String, T> getConverter(Class<T> targetType) {
+		return new StringToNumber<>(targetType);
+	}
+
+
+	private static final class StringToNumber<T extends Number> implements Converter<String, T> {
+
+		private final Class<T> targetType;
+
+		public StringToNumber(Class<T> targetType) {
+			this.targetType = targetType;
+		}
+
+		@Override
+		@Nullable
+		public T convert(String source) {
+			if (source.isEmpty()) {
+				return null;
+			}
+            //使用工具类NumberUtils进行转换
+			return NumberUtils.parseNumber(source, this.targetType);
+		}
+	}
+
+}
+
+====================================================================================================
+    //工具类方法里的转换如下,就是判断目标值是属于哪种类型,然后进行转换
+    //转换成功然后返回
+    	public static <T extends Number> T parseNumber(String text, Class<T> targetClass) {
+		Assert.notNull(text, "Text must not be null");
+		Assert.notNull(targetClass, "Target class must not be null");
+		String trimmed = StringUtils.trimAllWhitespace(text);
+
+		if (Byte.class == targetClass) {
+			return (T) (isHexNumber(trimmed) ? Byte.decode(trimmed) : Byte.valueOf(trimmed));
+		}
+		else if (Short.class == targetClass) {
+			return (T) (isHexNumber(trimmed) ? Short.decode(trimmed) : Short.valueOf(trimmed));
+		}
+		else if (Integer.class == targetClass) {
+			return (T) (isHexNumber(trimmed) ? Integer.decode(trimmed) : Integer.valueOf(trimmed));
+		}
+		else if (Long.class == targetClass) {
+			return (T) (isHexNumber(trimmed) ? Long.decode(trimmed) : Long.valueOf(trimmed));
+		}
+		else if (BigInteger.class == targetClass) {
+			return (T) (isHexNumber(trimmed) ? decodeBigInteger(trimmed) : new BigInteger(trimmed));
+		}
+		else if (Float.class == targetClass) {
+			return (T) Float.valueOf(trimmed);
+		}
+		else if (Double.class == targetClass) {
+			return (T) Double.valueOf(trimmed);
+		}
+		else if (BigDecimal.class == targetClass || Number.class == targetClass) {
+			return (T) new BigDecimal(trimmed);
+		}
+		else {
+			throw new IllegalArgumentException(
+					"Cannot convert String [" + text + "] to target class [" + targetClass.getName() + "]");
+		}
+	}
+    
+```
+
+**WebDataBinder 利用它里面的 Converters 将请求数据转成指定的数据类型。再次封装到JavaBean中**
+
+可看到binder绑定器里有要转换的对象`target`和所有转换器
+
+![](http://120.77.237.175:9080/photos/springboot/95.jpg)
+
+mpvs获取所有的请求值
+
+![](http://120.77.237.175:9080/photos/springboot/96.jpg)
+
+当进入this.typeConverterDelegate.convertIfNecessary()方法时,可以看到把124个转换器也传了进来
+
+![](http://120.77.237.175:9080/photos/springboot/97.jpg)
+
+> 因此SpringMvc已经为我们注册了所需的Converter，GenericConverter和数据绑定器ConfigurableWebBindingInitializer
+
+```java
+		//通过看源码WebMvcAutoConfiguration已经配置好了数据绑定器
+		@Override
+		protected ConfigurableWebBindingInitializer getConfigurableWebBindingInitializer(
+				FormattingConversionService mvcConversionService, Validator mvcValidator) {
+			try {
+				return this.beanFactory.getBean(ConfigurableWebBindingInitializer.class);
+			}
+			catch (NoSuchBeanDefinitionException ex) {
+				return super.getConfigurableWebBindingInitializer(mvcConversionService, mvcValidator);
+			}
+		}
+```
+
+
+
 #### 参数处理原理
 
 - `HandlerMapping`中找到能处理请求的`Handler（Controller.method()`
@@ -2867,7 +3994,7 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter{
 			webRequest.requestCompleted();
 		}			
 }
-
+===================================================
 public void invokeAndHandle(ServletWebRequest webRequest, ModelAndViewContainer mavContainer,
 			Object... providedArgs) throws Exception {
 
@@ -2952,7 +4079,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 	public boolean supportsParameter(MethodParameter parameter) {
 		return getArgumentResolver(parameter) != null;
 	}
-
+===================================================
 	@Nullable
 	private HandlerMethodArgumentResolver getArgumentResolver(MethodParameter parameter) {
         //获取26个参数解析器,进行循环,逐个去找哪个解析器可以处理我们当前的参数
@@ -2971,7 +4098,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 		}
 		return result;
 	}
-
+============================================================
 	//首先进入的是RequestParamMethodArgumentResolver的解析器
 	@Override
 	public boolean supportsParameter(MethodParameter parameter) {
@@ -3002,7 +4129,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 			}
 		}
 	}
-
+=========================================================
 //第二次循环进入的是RequestParamMapMethodArgumentResolver解析器
 	@Override
 	public boolean supportsParameter(MethodParameter parameter) {
@@ -3011,7 +4138,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 		return (requestParam != null && Map.class.isAssignableFrom(parameter.getParameterType()) &&
 				!StringUtils.hasText(requestParam.name()));
 	}
-
+============================================================
 //第三次循环进入的是PathVariableMethodArgumentResolver解析器
 	@Override
 	public boolean supportsParameter(MethodParameter parameter) {
@@ -3042,7 +4169,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 		}
 		return resolver.resolveArgument(parameter, mavContainer, webRequest, binderFactory);
 	}
-	
+================================================	
 	//webRequest请求的地址:/car/1/owner/lisi
 	@Override
 	public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
@@ -3089,6 +4216,517 @@ private HandlerMethodArgumentResolverComposite argumentResolvers;
 ##### 返回值处理器
 
 ![](http://120.77.237.175:9080/photos/springboot/90.jpg)
+
+#### 自定义Converter
+
+```html
+<form action="/saveuser" method="post">
+    姓名： <input name="userName" value="zhangsan"/> <br/>
+    年龄： <input name="age" value="18"/> <br/>
+    生日： <input name="birth" value="2019/12/10"/> <br/>
+    <!--    宠物姓名：<input name="pet.name" value="阿猫"/><br/>-->
+    <!--    宠物年龄：<input name="pet.age" value="5"/>-->
+    宠物： <input name="pet" value="啊猫,3"/>	 <!--传自定义属性值-->
+    <input type="submit" value="保存"/>
+</form>
+```
+
+```java
+//当新增了我们自定义的参数转化器后,可从DEBUG中,查询到之前124个转化器增加到了125个
+@Bean
+  public WebMvcConfigurer webMvcConfigurer() {
+
+      @Override
+      public void addFormatters(FormatterRegistry registry) {
+        registry.addConverter(
+            //源类型=>目标类型
+            new Converter<String, Pet>() {
+              @Override
+              public Pet convert(String source) {
+                // 啊猫,3
+                if (!StringUtils.isEmpty(source)) {
+                  Pet pet = new Pet();
+                  String[] split = source.split(",");
+                  pet.setName(split[0]);
+                  pet.setAge(Integer.parseInt(split[1]));
+                }
+                return null;
+              }
+            });
+      }
+    };
+  }
+```
+
+### 数据响应与内容协商
+
+#### 响应JSON
+
+##### 返回解析器原理
+
+```java
+//引入依赖
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+=====================================web场景自动引入了json场景
+   <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-json</artifactId>
+      <version>2.3.7.RELEASE</version>
+      <scope>compile</scope>
+    </dependency>
+```
+
+###### 
+
+![](http://120.77.237.175:9080/photos/springboot/98.png)
+
+```java
+//继续进入
+invocableMethod.invokeAndHandle(webRequest, mavContainer);
+//之前进入invokeAndHandle是看请求参数,这次是看返回值
+public void invokeAndHandle(ServletWebRequest webRequest, ModelAndViewContainer mavContainer,
+			Object... providedArgs) throws Exception {
+	//利用反射处理请求参数,然后再去到我们自身的Controller处理
+		Object returnValue = invokeForRequest(webRequest, mavContainer, providedArgs);
+		setResponseStatus(webRequest);
+//url:/test/person
+//returnValue返回值Person(userName=lisi, age=28, birth=Thu Jan 07 13:48:05 CST 2021, pet=null)
+ //以下判断返回值不为NULL,并且返回值是否字符串,同时是否含有返回失败原因
+		if (returnValue == null) {
+			if (isRequestNotModified(webRequest) || getResponseStatus() != null || mavContainer.isRequestHandled()) {
+				disableContentCachingIfNecessary(webRequest);
+				mavContainer.setRequestHandled(true);
+				return;
+			}
+		}
+		else if (StringUtils.hasText(getResponseStatusReason())) {
+			mavContainer.setRequestHandled(true);
+			return;
+		}
+
+		mavContainer.setRequestHandled(false);
+		Assert.state(this.returnValueHandlers != null, "No return value handlers");
+		try {
+            //重点:返回值处理器处理我们的所有的返回值,进入这里
+			this.returnValueHandlers.handleReturnValue(
+					returnValue, getReturnValueType(returnValue), mavContainer, webRequest);
+		}
+		catch (Exception ex) {
+			if (logger.isTraceEnabled()) {
+				logger.trace(formatErrorForReturnValue(returnValue), ex);
+			}
+			throw ex;
+		}
+	}
+
+===================================================
+    	@Override
+	public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
+			ModelAndViewContainer mavContainer, NativeWebRequest webRequest) throws Exception {
+		//寻找是合有适合处理我们返回值的处理器,继续进入
+		HandlerMethodReturnValueHandler handler = selectHandler(returnValue, returnType);
+		if (handler == null) {
+			throw new IllegalArgumentException("Unknown return value type: " + returnType.getParameterType().getName());
+		}
+    	//处理返回值, 继续进入研究,可看下面原理
+		handler.handleReturnValue(returnValue, returnType, mavContainer, webRequest);
+	}
+
+	@Nullable
+	private HandlerMethodReturnValueHandler selectHandler(@Nullable Object value, MethodParameter returnType) {
+        //判断是否异步返回值,现在我们的请求不是,进入可以看下如何判断
+		boolean isAsyncValue = isAsyncReturnValue(value, returnType);
+		for (HandlerMethodReturnValueHandler handler : this.returnValueHandlers) {
+			if (isAsyncValue && !(handler instanceof AsyncHandlerMethodReturnValueHandler)) {
+				continue;
+			}
+            //查找上面的15个处理器是否有support返回我们的返回类型,进入可以看下是如何处理,先看它的接口HandlerMethodReturnValueHandler,如下图
+            //最终我们找到的返回值处理器是RequestResponseBodyMethodProcessor,因为我们的Controller标的是@ResponseBody
+			if (handler.supportsReturnType(returnType)) {
+				return handler;
+			}
+		}
+		return null;
+	}
+
+=========================================
+    //判断是否异步返回值,就是遍历所有的返回值处理器,逐个去找,返回
+    private boolean isAsyncReturnValue(@Nullable Object value, MethodParameter returnType) {
+		for (HandlerMethodReturnValueHandler handler : this.returnValueHandlers) {
+			if (handler instanceof AsyncHandlerMethodReturnValueHandler &&
+					((AsyncHandlerMethodReturnValueHandler) handler).isAsyncReturnValue(value, returnType)) {
+				return true;
+			}
+		}
+		return false;
+	}
+```
+
+![](http://120.77.237.175:9080/photos/springboot/99.jpg)
+
+最终找到的`RequestResponseBodyMethodProcessor`支持我们的返回类型
+
+```java
+	@Override
+	public boolean supportsReturnType(MethodParameter returnType) {
+        //判断是否有@ReponseBody注解类型
+		return (AnnotatedElementUtils.hasAnnotation(returnType.getContainingClass(), ResponseBody.class) ||
+				returnType.hasMethodAnnotation(ResponseBody.class));
+	}
+
+```
+
+
+
+- 1、返回值处理器判断是否支持这种类型返回值 `supportsReturnType`
+- 2、返回值处理器调用` handleReturnValue` 进行处理
+- 3、`RequestResponseBodyMethodProcessor` 可以处理返回值标了`@ResponseBody` 注解的。
+
+- - 1. 利用 MessageConverters 进行处理 将数据写为json
+
+- - - 1、内容协商（浏览器默认会以请求头的方式告诉服务器他能接受什么样的内容类型）
+    - 2、服务器最终根据自己自身的能力，决定服务器能生产出什么样内容类型的数据，
+    - 3、SpringMVC会挨个遍历所有容器底层的 HttpMessageConverter ，看谁能处理？
+
+- - - - 1、得到MappingJackson2HttpMessageConverter可以将对象写为json
+      - 2、利用MappingJackson2HttpMessageConverter将对象转为json再写出去。
+
+##### SpringMVC到底支持哪些返回值
+
+```java
+ModelAndView
+Model
+View
+ResponseEntity 
+ResponseBodyEmitter
+StreamingResponseBody
+HttpEntity
+HttpHeaders
+Callable
+DeferredResult
+ListenableFuture
+CompletionStage
+WebAsyncTask
+有 @ModelAttribute 且为对象类型的
+@ResponseBody 注解 ---> RequestResponseBodyMethodProcessor；
+//上面15个返回值处理器所支持的返回类型
+```
+
+##### 处理返回值原理
+
+```java
+	//找到合适的返回值解析器,处理返回值
+	@Override
+	public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
+			ModelAndViewContainer mavContainer, NativeWebRequest webRequest)
+			throws IOException, HttpMediaTypeNotAcceptableException, HttpMessageNotWritableException {
+
+		mavContainer.setRequestHandled(true);
+		ServletServerHttpRequest inputMessage = createInputMessage(webRequest);
+		ServletServerHttpResponse outputMessage = createOutputMessage(webRequest);
+
+		// 使用消息转换器进行写出操作,继续进入
+		writeWithMessageConverters(returnValue, returnType, inputMessage, outputMessage);
+	}
+
+
+==============================================================================
+    
+    	protected <T> void writeWithMessageConverters(@Nullable T value, MethodParameter returnType,
+			ServletServerHttpRequest inputMessage, ServletServerHttpResponse outputMessage)
+			throws IOException, HttpMediaTypeNotAcceptableException, HttpMessageNotWritableException {
+
+		Object body;
+		Class<?> valueType;
+		Type targetType;
+		//判断值是否字符串,判断false,不是
+		if (value instanceof CharSequence) {
+			body = value.toString();
+			valueType = String.class;
+			targetType = String.class;
+		}
+		else {
+			body = value;
+			valueType = getReturnValueType(body, returnType);
+			targetType = GenericTypeResolver.resolveType(getGenericType(returnType), returnType.getContainingClass());
+		}
+		//判断是否流类型,可以进去看下,判断false,不是
+		if (isResourceType(value, returnType)) {
+			outputMessage.getHeaders().set(HttpHeaders.ACCEPT_RANGES, "bytes");
+			if (value != null && inputMessage.getHeaders().getFirst(HttpHeaders.RANGE) != null &&
+					outputMessage.getServletResponse().getStatus() == 200) {
+				Resource resource = (Resource) value;
+				try {
+					List<HttpRange> httpRanges = inputMessage.getHeaders().getRange();
+					outputMessage.getServletResponse().setStatus(HttpStatus.PARTIAL_CONTENT.value());
+					body = HttpRange.toResourceRegions(httpRanges, resource);
+					valueType = body.getClass();
+					targetType = RESOURCE_REGION_LIST_TYPE;
+				}
+				catch (IllegalArgumentException ex) {
+					outputMessage.getHeaders().set(HttpHeaders.CONTENT_RANGE, "bytes */" + resource.contentLength());
+					outputMessage.getServletResponse().setStatus(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE.value());
+				}
+			}
+		}
+		//获取媒体类型
+		MediaType selectedMediaType = null;
+    	//根据浏览头信息,获取content-type信息,现在为Null
+		MediaType contentType = outputMessage.getHeaders().getContentType();
+		boolean isContentTypePreset = contentType != null && contentType.isConcrete();
+    	//判断content-type是否已经存有信息,有就直接获取,现在为false, 直接跳过
+		if (isContentTypePreset) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Found 'Content-Type:" + contentType + "' in response");
+			}
+			selectedMediaType = contentType;
+		}
+		else {
+            //浏览器请求头现在允许接收的类型,如下:q=x表示权重,数字越大表示可接收的类型越前
+            //Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
+			HttpServletRequest request = inputMessage.getServletRequest();
+            //获取浏览器可接收的协议类型
+			List<MediaType> acceptableTypes = getAcceptableMediaTypes(request);
+            //获取服务器可生产的协议类型
+			List<MediaType> producibleTypes = getProducibleMediaTypes(request, valueType, targetType);
+
+			if (body != null && producibleTypes.isEmpty()) {
+				throw new HttpMessageNotWritableException(
+						"No converter found for return value of type: " + valueType);
+			}
+            //根据浏览器头信息,获取到现在acceptableTypes可接收的类型有7种,而producibleTypes为4种,如下图
+            //因此下面的嵌套循环总共要遍历28次去找相互可协议一致的类型
+			List<MediaType> mediaTypesToUse = new ArrayList<>();
+			for (MediaType requestedType : acceptableTypes) {
+				for (MediaType producibleType : producibleTypes) {
+					if (requestedType.isCompatibleWith(producibleType)) {
+						mediaTypesToUse.add(getMostSpecificMediaType(requestedType, producibleType));
+					}
+				}
+			}
+            //最终找到可以处理JSON,因为浏览器有*/*,可以接收任何数据
+			if (mediaTypesToUse.isEmpty()) {
+				if (body != null) {
+					throw new HttpMediaTypeNotAcceptableException(producibleTypes);
+				}
+				if (logger.isDebugEnabled()) {
+					logger.debug("No match for " + acceptableTypes + ", supported: " + producibleTypes);
+				}
+				return;
+			}
+
+			MediaType.sortBySpecificityAndQuality(mediaTypesToUse);
+
+			for (MediaType mediaType : mediaTypesToUse) {
+				if (mediaType.isConcrete()) {
+					selectedMediaType = mediaType;
+					break;
+				}
+				else if (mediaType.isPresentIn(ALL_APPLICATION_MEDIA_TYPES)) {
+					selectedMediaType = MediaType.APPLICATION_OCTET_STREAM;
+					break;
+				}
+			}
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("Using '" + selectedMediaType + "', given " +
+						acceptableTypes + " and supported " + producibleTypes);
+			}
+		}
+
+    	
+		if (selectedMediaType != null) {
+			selectedMediaType = selectedMediaType.removeQualityValue();
+            //找到合并的协议后,就要找合适的消息转换器去转换处理结果,HttpMessageConverter接口如下:
+            //总共有10个messageConverter,如下图
+			for (HttpMessageConverter<?> converter : this.messageConverters) {
+				GenericHttpMessageConverter genericConverter = (converter instanceof GenericHttpMessageConverter ?
+						(GenericHttpMessageConverter<?>) converter : null);
+				if (genericConverter != null ?
+                    //判断是否可写,可进入看如何判断,最终找到MappingJackson2HttpMessageConverter,把对象转为JSON
+						((GenericHttpMessageConverter) converter).canWrite(targetType, valueType, selectedMediaType) :
+						converter.canWrite(valueType, selectedMediaType)) {
+					body = getAdvice().beforeBodyWrite(body, returnType, selectedMediaType,
+							(Class<? extends HttpMessageConverter<?>>) converter.getClass(),
+							inputMessage, outputMessage);
+					if (body != null) {
+						Object theBody = body;
+						LogFormatUtils.traceDebug(logger, traceOn ->
+								"Writing [" + LogFormatUtils.formatValue(theBody, !traceOn) + "]");
+						addContentDispositionHeader(inputMessage, outputMessage);
+						if (genericConverter != null) {
+                            //找到适合的转换器,直接写,进去研究
+							genericConverter.write(body, targetType, selectedMediaType, outputMessage);
+						}
+						else {
+							((HttpMessageConverter) converter).write(body, selectedMediaType, outputMessage);
+						}
+					}
+					else {
+						if (logger.isDebugEnabled()) {
+							logger.debug("Nothing to write: null body");
+						}
+					}
+					return;
+				}
+			}
+		}
+
+		if (body != null) {
+			Set<MediaType> producibleMediaTypes =
+					(Set<MediaType>) inputMessage.getServletRequest()
+							.getAttribute(HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE);
+
+			if (isContentTypePreset || !CollectionUtils.isEmpty(producibleMediaTypes)) {
+				throw new HttpMessageNotWritableException(
+						"No converter for [" + valueType + "] with preset Content-Type '" + contentType + "'");
+			}
+			throw new HttpMediaTypeNotAcceptableException(this.allSupportedMediaTypes);
+		}
+	}
+
+========================================================
+	@Override
+	public final void write(final T t, @Nullable final Type type, @Nullable MediaType contentType,
+			HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
+		//获取响应头,现在没有,默认为空
+		final HttpHeaders headers = outputMessage.getHeaders();
+    	//添加响应头:ContentType:application/json
+		addDefaultHeaders(headers, t, contentType);
+
+		if (outputMessage instanceof StreamingHttpOutputMessage) {
+			StreamingHttpOutputMessage streamingOutputMessage = (StreamingHttpOutputMessage) outputMessage;
+			streamingOutputMessage.setBody(outputStream -> writeInternal(t, type, new HttpOutputMessage() {
+				@Override
+				public OutputStream getBody() {
+					return outputStream;
+				}
+				@Override
+				public HttpHeaders getHeaders() {
+					return headers;
+				}
+			}));
+		}
+		else {
+            //写进去,继续DEBUG研究
+			writeInternal(t, type, outputMessage);
+			outputMessage.getBody().flush();	//返回数据到浏览器,如下图
+		}
+	}
+
+==============================================
+    //利用JSON2格式化数据
+    	@Override
+	protected void writeInternal(Object object, @Nullable Type type, HttpOutputMessage outputMessage)
+			throws IOException, HttpMessageNotWritableException {
+
+		MediaType contentType = outputMessage.getHeaders().getContentType();
+		JsonEncoding encoding = getJsonEncoding(contentType);
+
+		OutputStream outputStream = StreamUtils.nonClosing(outputMessage.getBody());
+		JsonGenerator generator = this.objectMapper.getFactory().createGenerator(outputStream, encoding);
+		try {
+			writePrefix(generator, object);
+
+			Object value = object;
+			Class<?> serializationView = null;
+			FilterProvider filters = null;
+			JavaType javaType = null;
+
+			if (object instanceof MappingJacksonValue) {
+				MappingJacksonValue container = (MappingJacksonValue) object;
+				value = container.getValue();
+				serializationView = container.getSerializationView();
+				filters = container.getFilters();
+			}
+			if (type != null && TypeUtils.isAssignable(type, value.getClass())) {
+				javaType = getJavaType(type, null);
+			}
+
+			ObjectWriter objectWriter = (serializationView != null ?
+					this.objectMapper.writerWithView(serializationView) : this.objectMapper.writer());
+			if (filters != null) {
+				objectWriter = objectWriter.with(filters);
+			}
+			if (javaType != null && javaType.isContainerType()) {
+				objectWriter = objectWriter.forType(javaType);
+			}
+			SerializationConfig config = objectWriter.getConfig();
+			if (contentType != null && contentType.isCompatibleWith(MediaType.TEXT_EVENT_STREAM) &&
+					config.isEnabled(SerializationFeature.INDENT_OUTPUT)) {
+				objectWriter = objectWriter.with(this.ssePrettyPrinter);
+			}
+            //写数据
+			objectWriter.writeValue(generator, value);
+
+			writeSuffix(generator, object);
+			generator.flush();
+			generator.close();	//刷新缓冲区,返回给浏览器
+		}
+		catch (InvalidDefinitionException ex) {
+			throw new HttpMessageConversionException("Type definition error: " + ex.getType(), ex);
+		}
+		catch (JsonProcessingException ex) {
+			throw new HttpMessageNotWritableException("Could not write JSON: " + ex.getOriginalMessage(), ex);
+		}
+	}
+```
+
+###### 浏览器协议的内容和服务器协议的内容
+
+![](http://120.77.237.175:9080/photos/springboot/100.jpg)
+
+###### HttpMessageConverter消息转换器接口
+
+![](http://120.77.237.175:9080/photos/springboot/101.jpg)
+
+所有的消息转换器都会继承其接口
+
+HttpMessageConverter: 看是否支持将 此 Class类型的对象，转为MediaType类型的数据。
+
+例子：Person对象转为JSON。或者 JSON转为Person
+
+###### 默认的MessageConveter
+
+![](http://120.77.237.175:9080/photos/springboot/102.jpg)
+
+```java
+0 - 只支持Byte类型的
+1 - String
+2 - String
+3 - Resource
+4 - ResourceRegion
+5 - DOMSource.class \ SAXSource.class) \ StAXSource.class \StreamSource.class \Source.class
+6 - MultiValueMap
+7 - true 
+8 - true
+9 - 支持注解方式xml处理的。
+```
+
+###### 消息转为JSON
+
+最终 MappingJackson2HttpMessageConverter  把对象转为JSON（利用底层的jackson的objectMapper转换的）
+
+![](http://120.77.237.175:9080/photos/springboot/103.jpg)
+
+```java
+@ResponseBody //利用返回值处理器里面的消息转换器进行处理
+//因此同理,也可以利用@ResponseBody返回其它的数据类型,例如
+
+//利用--RequestResponseBodyMethodProcessor ---> messageConverter转换指定的数据类型
+//Resource使用的是ResourceHttpMessageConverter转换类型,而Resource继承的是InputStreamSource
+@ResponseBody
+@GetMapping("/he11")
+public FileSystemResource file(){
+    //文件以这样的方式返回看是谁处理的（messageConverter）。
+    return null;
+}
+```
+
+
 
 ## 模板引擎 ##
 
@@ -3357,7 +4995,7 @@ Spring Boot 自动配置好了SpringMVC
 
 **自己给容器中添加HttpMessageConverter，只需要将自己的组件注册容器中（@Bean,@Component）**
 
-#### MessageCodesResolver 定义错误代码生成规则####
+#### MessageCodesResolver 定义错误代码生成规则
 
 #### ConfigurableWebBindingInitializer  ####
 

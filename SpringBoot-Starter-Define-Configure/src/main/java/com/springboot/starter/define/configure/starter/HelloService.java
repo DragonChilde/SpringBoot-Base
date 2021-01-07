@@ -1,6 +1,8 @@
 package com.springboot.starter.define.configure.starter;
 
+import org.springframework.stereotype.Service;
 
+@Service
 public class HelloService {
 
     HelloProperties helloProperties;
