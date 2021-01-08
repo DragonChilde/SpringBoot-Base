@@ -4726,7 +4726,404 @@ public FileSystemResource file(){
 }
 ```
 
+#### 内容协商
 
+根据客户端接收能力不同，返回不同媒体类型的数据
+
+#####  引入依赖
+
+```java
+ <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-xml</artifactId>
+</dependency>
+```
+
+##### 测试
+
+根据不同的请求头返回json和xml
+
+##### 原理
+
+1. 判断当前响应头中是否已经有确定的媒体类型。`MediaType`
+2. 获取客户端（PostMan、浏览器）支持接收的内容类型。（获取客户端Accept请求头字段）【application/xml】
+   - contentNegotiationManager 内容协商管理器 默认使用基于请求头的策略
+   - HeaderContentNegotiationStrategy  确定客户端可以接收的内容类型
+
+3. 遍历循环所有当前系统的 MessageConverter，看谁支持操作这个对象（Person）
+4. 找到支持操作Person的converter，把converter支持的媒体类型统计出来。
+5. 客户端需要【application/xml】。服务端能力【10种、json、xml】
+6. 进行内容协商的最佳匹配媒体类型
+7. 用 支持 将对象转为 最佳匹配媒体类型 的converter。调用它进行转化 。
+
+```java
+	//上面的数据返回原理已说明整个数据返回的整个处理流程,这里直接可以DEBUG进AbstractMessageConverterMethodProcessor类的
+	//方法里看是如何进行协商的
+	protected <T> void writeWithMessageConverters(@Nullable T value, MethodParameter returnType,
+			ServletServerHttpRequest inputMessage, ServletServerHttpResponse outputMessage)
+			throws IOException, HttpMediaTypeNotAcceptableException, HttpMessageNotWritableException {
+
+		Object body;
+		Class<?> valueType;
+		Type targetType;
+
+		if (value instanceof CharSequence) {
+			body = value.toString();
+			valueType = String.class;
+			targetType = String.class;
+		}
+		else {
+			body = value;
+			valueType = getReturnValueType(body, returnType);
+			targetType = GenericTypeResolver.resolveType(getGenericType(returnType), returnType.getContainingClass());
+		}
+
+		if (isResourceType(value, returnType)) {
+			outputMessage.getHeaders().set(HttpHeaders.ACCEPT_RANGES, "bytes");
+			if (value != null && inputMessage.getHeaders().getFirst(HttpHeaders.RANGE) != null &&
+					outputMessage.getServletResponse().getStatus() == 200) {
+				Resource resource = (Resource) value;
+				try {
+					List<HttpRange> httpRanges = inputMessage.getHeaders().getRange();
+					outputMessage.getServletResponse().setStatus(HttpStatus.PARTIAL_CONTENT.value());
+					body = HttpRange.toResourceRegions(httpRanges, resource);
+					valueType = body.getClass();
+					targetType = RESOURCE_REGION_LIST_TYPE;
+				}
+				catch (IllegalArgumentException ex) {
+					outputMessage.getHeaders().set(HttpHeaders.CONTENT_RANGE, "bytes */" + resource.contentLength());
+					outputMessage.getServletResponse().setStatus(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE.value());
+				}
+			}
+		}
+		//开始进行内容协商
+		MediaType selectedMediaType = null;
+        //contentType首次进来是为空的
+		MediaType contentType = outputMessage.getHeaders().getContentType();
+		boolean isContentTypePreset = contentType != null && contentType.isConcrete();
+		if (isContentTypePreset) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Found 'Content-Type:" + contentType + "' in response");
+			}
+			selectedMediaType = contentType;
+		}
+		else {
+            //重点是这里
+			HttpServletRequest request = inputMessage.getServletRequest();
+            //首先获取客户端支持接收的内容类型,DEBUG进入这里
+            //请求头现在使用的是Accepet:application/xml访问的,acceptableTypes现在返回的请求头也是一样
+			List<MediaType> acceptableTypes = getAcceptableMediaTypes(request);
+            //然后进入服务端获取可产生的协议,DEBUG进入这里
+			List<MediaType> producibleTypes = getProducibleMediaTypes(request, valueType, targetType);
+
+			if (body != null && producibleTypes.isEmpty()) {
+				throw new HttpMessageNotWritableException(
+						"No converter found for return value of type: " + valueType);
+			}
+			List<MediaType> mediaTypesToUse = new ArrayList<>();
+            //遍历循环找到最佳的匹配,现在acceptableTypes只允许接收application/xml,因此找服务器哪个可以处理此协议
+			for (MediaType requestedType : acceptableTypes) {
+				for (MediaType producibleType : producibleTypes) {
+					if (requestedType.isCompatibleWith(producibleType)) {
+						mediaTypesToUse.add(getMostSpecificMediaType(requestedType, producibleType));
+					}
+				}
+			}
+			if (mediaTypesToUse.isEmpty()) {
+				if (body != null) {
+					throw new HttpMediaTypeNotAcceptableException(producibleTypes);
+				}
+				if (logger.isDebugEnabled()) {
+					logger.debug("No match for " + acceptableTypes + ", supported: " + producibleTypes);
+				}
+				return;
+			}
+			//找到后在这里进行排序
+			MediaType.sortBySpecificityAndQuality(mediaTypesToUse);
+
+			for (MediaType mediaType : mediaTypesToUse) {
+				if (mediaType.isConcrete()) {
+					selectedMediaType = mediaType;
+					break;
+				}
+				else if (mediaType.isPresentIn(ALL_APPLICATION_MEDIA_TYPES)) {
+					selectedMediaType = MediaType.APPLICATION_OCTET_STREAM;
+					break;
+				}
+			}
+
+			if (logger.isDebugEnabled()) {
+				logger.debug("Using '" + selectedMediaType + "', given " +
+						acceptableTypes + " and supported " + producibleTypes);
+			}
+		}
+
+        //注意:messageConverters总共使用了两次,第一次是上面查找最佳匹配,然后这里又找哪个消息转换器可以处理返回
+        //然后处理返回结果跟上面的返回值原理一样,都是找转换器是否可写,然后进入转换器进行写操作转换数据
+        //最终转换数据输出给浏览器,如下图
+		if (selectedMediaType != null) {
+			selectedMediaType = selectedMediaType.removeQualityValue();
+			for (HttpMessageConverter<?> converter : this.messageConverters) {
+				GenericHttpMessageConverter genericConverter = (converter instanceof GenericHttpMessageConverter ?
+						(GenericHttpMessageConverter<?>) converter : null);
+				if (genericConverter != null ?
+						((GenericHttpMessageConverter) converter).canWrite(targetType, valueType, selectedMediaType) :
+						converter.canWrite(valueType, selectedMediaType)) {
+					body = getAdvice().beforeBodyWrite(body, returnType, selectedMediaType,
+							(Class<? extends HttpMessageConverter<?>>) converter.getClass(),
+							inputMessage, outputMessage);
+					if (body != null) {
+						Object theBody = body;
+						LogFormatUtils.traceDebug(logger, traceOn ->
+								"Writing [" + LogFormatUtils.formatValue(theBody, !traceOn) + "]");
+						addContentDispositionHeader(inputMessage, outputMessage);
+						if (genericConverter != null) {
+							genericConverter.write(body, targetType, selectedMediaType, outputMessage);
+						}
+						else {
+							((HttpMessageConverter) converter).write(body, selectedMediaType, outputMessage);
+						}
+					}
+					else {
+						if (logger.isDebugEnabled()) {
+							logger.debug("Nothing to write: null body");
+						}
+					}
+					return;
+				}
+			}
+		}
+
+		if (body != null) {
+			Set<MediaType> producibleMediaTypes =
+					(Set<MediaType>) inputMessage.getServletRequest()
+							.getAttribute(HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE);
+
+			if (isContentTypePreset || !CollectionUtils.isEmpty(producibleMediaTypes)) {
+				throw new HttpMessageNotWritableException(
+						"No converter for [" + valueType + "] with preset Content-Type '" + contentType + "'");
+			}
+			throw new HttpMediaTypeNotAcceptableException(this.allSupportedMediaTypes);
+		}
+	}
+
+================================================
+    private List<MediaType> getAcceptableMediaTypes(HttpServletRequest request)
+			throws HttpMediaTypeNotAcceptableException {
+			//继续进入这里
+		return this.contentNegotiationManager.resolveMediaTypes(new ServletWebRequest(request));
+	}
+
+============================================
+    	@Override
+	public List<MediaType> resolveMediaTypes(NativeWebRequest request) throws HttpMediaTypeNotAcceptableException {
+    //ContentNegotiationStrategy策略模式接口,默认是使用请求头的
+    for (ContentNegotiationStrategy strategy : this.strategies) {
+            //继续进入这里,寻找内容协商策略,默认就只有一个,请求头模式,如下图
+			List<MediaType> mediaTypes = strategy.resolveMediaTypes(request);
+			if (mediaTypes.equals(MEDIA_TYPE_ALL_LIST)) {
+				continue;
+			}
+			return mediaTypes;
+		}
+		return MEDIA_TYPE_ALL_LIST;
+	}
+
+===================================================================================
+    	@Override
+	public List<MediaType> resolveMediaTypes(NativeWebRequest request)
+			throws HttpMediaTypeNotAcceptableException {
+		//可以看到,这里就是利用原生的request获取请求头的
+		String[] headerValueArray = request.getHeaderValues(HttpHeaders.ACCEPT);
+		if (headerValueArray == null) {
+			return MEDIA_TYPE_ALL_LIST;
+		}
+ 	... 
+}
+
+=============================================================================================
+    	protected List<MediaType> getProducibleMediaTypes(
+			HttpServletRequest request, Class<?> valueClass, @Nullable Type targetType) {
+
+		Set<MediaType> mediaTypes =
+				(Set<MediaType>) request.getAttribute(HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE);
+		if (!CollectionUtils.isEmpty(mediaTypes)) {
+			return new ArrayList<>(mediaTypes);
+		}
+		else if (!this.allSupportedMediaTypes.isEmpty()) {
+			List<MediaType> result = new ArrayList<>();
+            //因为加入了xml的依赖,现在messageConverters的消息转换器变为了11个
+            //循环遍历所有的消息转换器,看哪个转换器魂转换Person类,最终找到支持的所有转换器,返回
+			for (HttpMessageConverter<?> converter : this.messageConverters) {
+				if (converter instanceof GenericHttpMessageConverter && targetType != null) {
+					if (((GenericHttpMessageConverter<?>) converter).canWrite(targetType, valueClass, null)) {
+						result.addAll(converter.getSupportedMediaTypes());
+					}
+				}
+				else if (converter.canWrite(valueClass, null)) {
+					result.addAll(converter.getSupportedMediaTypes());
+				}
+			}
+            //最终找到可以处理的协议如下图
+			return result;
+		}
+		else {
+			return Collections.singletonList(MediaType.ALL);
+		}
+	}
+```
+
+寻找到的内容协商策略,默认就只有一个,默认就是使用请求头的策略
+
+![](http://120.77.237.175:9080/photos/springboot/106.jpg)
+
+XML请求,服务器可以生产的协议内容
+
+![](http://120.77.237.175:9080/photos/springboot/104.jpg)
+
+XML请求,最终返回结果存在如下图
+
+![](http://120.77.237.175:9080/photos/springboot/105.jpg)
+
+> JSON请求头的处理过程原理同理,浏览器请求为何会直接显示xml而不显示JSON,因为浏览器的请求头的xml的权重比较高
+
+```
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
+```
+
+只需要改变请求头中Accept字段。Http协议中规定的，告诉服务器本客户端可以接收的数据类型。
+
+##### 开启浏览器参数方式内容协商功能
+
+通过上面的原理,清楚知道默认使用的是请求头的方式,返回协议数据类型,为了方便内容协商，开启基于请求参数的内容协商功能。
+
+```java
+//url:test/person?format=xml
+//url:test/person?format=json
+//根据不同的请求格式返回数据
+spring:
+  mvc:
+    contentnegotiation:
+      favor-parameter: true  #开启请求参数内容协商模式
+```
+
+其原理跟上面的一样.只是在选择返回的策略时会有异同如下图,可看到当我们配置了后,多了个参数策略,而参数名和协议反回的类型是固定的
+
+![](http://120.77.237.175:9080/photos/springboot/107.jpg)
+
+##### 自定义协商策略
+
+**实现多协议数据兼容。json、xml、x-test**
+
+```
+  /**
+   * 1、浏览器发请求直接返回 xml    [application/xml]        jacksonXmlConverter
+   * 2、如果是ajax请求 返回 json   [application/json]      jacksonJsonConverter
+   * 3、如果app发请求，返回自定义协议数据  [appliaction/x-test]   xxxxConverter
+   *          属性值1;属性值2;
+   *
+   * 步骤：
+   * 1、添加自定义的MessageConverter进系统底层
+   * 2、系统底层就会统计出所有MessageConverter能操作哪些类型
+   * 3、客户端内容协商 [test--->test]
+   *
+   */
+```
+
+1. **@ResponseBody 响应数据出去 调用 **RequestResponseBodyMethodProcessor** 处理
+2. Processor 处理方法返回值。通过 **MessageConverter** 处理
+3. 所有 **MessageConverter** 合起来可以支持各种媒体类型数据的操作（读、写）
+4. 内容协商找到最终的 **messageConverter**；
+
+SpringMVC的任何功能。一个入口给容器中添加一个 `WebMvcConfigurer`
+
+```java
+@Configuration
+public class WebConfig 
+   //WebMvcConfigurer定制化SpringMVC的功能
+    @Bean
+      public WebMvcConfigurer webMvcConfigurer() {
+        return new WebMvcConfigurer() {
+
+          /**
+           * 自定义协商策略
+           * @param configurer
+           */
+          @Override
+          public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
+
+            Map<String, MediaType> mediaTypes = new HashMap<>();
+            mediaTypes.put("json", MediaType.APPLICATION_JSON);
+            mediaTypes.put("xml", MediaType.APPLICATION_XML);
+            mediaTypes.put("gg", MediaType.parseMediaType("application/x-test"));
+              //指定支持解析哪些参数对应的哪些媒体类型
+            ParameterContentNegotiationStrategy strategy =
+                new ParameterContentNegotiationStrategy(mediaTypes);
+            HeaderContentNegotiationStrategy headerStrategy = new HeaderContentNegotiationStrategy();
+            configurer.strategies(Arrays.asList(strategy, headerStrategy));
+          }
+            
+            @Override
+          public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
+            converters.add(new MyMessageConveter());
+          }
+        }
+       }
+
+}
+```
+
+通过上面的自定义策略,可以看到现在允许的请求类型多了自定义的
+
+![](http://120.77.237.175:9080/photos/springboot/108.jpg)
+
+##### 自定义 MessageConverter
+
+```java
+public class MyMessageConveter implements HttpMessageConverter<Person> {
+  @Override
+  public boolean canRead(Class<?> clazz, MediaType mediaType) {
+    return false;
+  }
+
+  @Override
+  public boolean canWrite(Class<?> clazz, MediaType mediaType) {
+    return clazz.isAssignableFrom(Person.class);
+  }
+
+  /**
+   * 服务器要统计所有MessageConverter都能写出哪些内容类型
+   *
+   * <p>application/x-test
+   *
+   * @return
+   */
+  @Override
+  public List<MediaType> getSupportedMediaTypes() {
+    return MediaType.parseMediaTypes("application/x-test");
+  }
+
+  @Override
+  public Person read(Class<? extends Person> clazz, HttpInputMessage inputMessage)
+      throws IOException, HttpMessageNotReadableException {
+    return null;
+  }
+
+  @Override
+  public void write(Person person, MediaType contentType, HttpOutputMessage outputMessage)
+      throws IOException, HttpMessageNotWritableException {
+
+    // 自定义协议数据的写出
+    String data = person.getUserName() + ";" + person.getAge() + ";" + person.getBirth();	//最终访问结果:lisi;28;Fri Jan 08 17:28:36 CST 2021
+    OutputStream body = outputMessage.getBody();
+    body.write(data.getBytes());
+  }
+}
+```
+
+> 使用请求头Accept:application/x-test成功访问到自定义格式化的的数据,整个处理原理跟上面的一样,只是在处理返回数据时,多了上面自定义的转化器
+
+![](http://120.77.237.175:9080/photos/springboot/109.jpg)
 
 ## 模板引擎 ##
 
