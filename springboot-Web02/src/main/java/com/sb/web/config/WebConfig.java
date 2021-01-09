@@ -49,7 +49,7 @@ public class WebConfig /*implements WebMvcConfigurer*/ {
     return new WebMvcConfigurer() {
 
       /**
-       * 自定义协商策略
+       * 自定义协商策略,根据请求参数处理
        *
        * @param configurer
        */
@@ -62,10 +62,15 @@ public class WebConfig /*implements WebMvcConfigurer*/ {
         mediaTypes.put("gg", MediaType.parseMediaType("application/x-test"));
         ParameterContentNegotiationStrategy strategy =
             new ParameterContentNegotiationStrategy(mediaTypes);
+        //增加请求头策略,兼容自定义参数策略
         HeaderContentNegotiationStrategy headerStrategy = new HeaderContentNegotiationStrategy();
         configurer.strategies(Arrays.asList(strategy, headerStrategy));
       }
 
+      /**
+       * 自定义协商策略,根据请求头处理
+       * @param converters
+       */
       @Override
       public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
         converters.add(new MyMessageConveter());

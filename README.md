@@ -5046,7 +5046,7 @@ public class WebConfig
         return new WebMvcConfigurer() {
 
           /**
-           * 自定义协商策略
+           * 自定义协商策略,根据请求参数处理
            * @param configurer
            */
           @Override
@@ -5059,10 +5059,15 @@ public class WebConfig
               //指定支持解析哪些参数对应的哪些媒体类型
             ParameterContentNegotiationStrategy strategy =
                 new ParameterContentNegotiationStrategy(mediaTypes);
+              //增加请求头策略,兼容自定义参数策略
             HeaderContentNegotiationStrategy headerStrategy = new HeaderContentNegotiationStrategy();
             configurer.strategies(Arrays.asList(strategy, headerStrategy));
           }
             
+          /**
+           * 自定义协商策略,根据请求头处理
+           * @param converters
+           */
             @Override
           public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
             converters.add(new MyMessageConveter());
@@ -5073,9 +5078,13 @@ public class WebConfig
 }
 ```
 
-通过上面的自定义策略,可以看到现在允许的请求类型多了自定义的
+通过上面的自定义策略,可以看到现在允许的请求参数类型多了自定义的参数
 
 ![](http://120.77.237.175:9080/photos/springboot/108.jpg)
+
+根据请求头`application/x-test`类型找到对应的解析器解析自定义的请求类型
+
+![](http://120.77.237.175:9080/photos/springboot/110.jpg)
 
 ##### 自定义 MessageConverter
 
@@ -5122,6 +5131,10 @@ public class MyMessageConveter implements HttpMessageConverter<Person> {
 ```
 
 > 使用请求头Accept:application/x-test成功访问到自定义格式化的的数据,整个处理原理跟上面的一样,只是在处理返回数据时,多了上面自定义的转化器
+>
+> 而使用自定义请求参数处理话,上面自定义协商策略,根据请求参数处理定义配置就好了
+>
+> **开发过程中,有可能添加的自定义的功能会覆盖默认很多功能，导致一些默认的功能失效。**
 
 ![](http://120.77.237.175:9080/photos/springboot/109.jpg)
 
@@ -5155,20 +5168,29 @@ SpringBoot推荐的Thymeleaf；
 
 **源码配置**	
 
-	@ConfigurationProperties(
-	    prefix = "spring.thymeleaf"
-	)
-	public class ThymeleafProperties {
-	    private static final Charset DEFAULT_ENCODING;
-	    public static final String DEFAULT_PREFIX = "classpath:/templates/";
-	    public static final String DEFAULT_SUFFIX = ".html";
-	    private boolean checkTemplate = true;
-	    private boolean checkTemplateLocation = true;
-	    private String prefix = "classpath:/templates/";
-	    private String suffix = ".html";
-	    private String mode = "HTML";
+```java
+@ConfigurationProperties(
+    prefix = "spring.thymeleaf"
+)
+public class ThymeleafProperties {
+    private static final Charset DEFAULT_ENCODING;
+    public static final String DEFAULT_PREFIX = "classpath:/templates/";	//模板的默认存放路径
+    public static final String DEFAULT_SUFFIX = ".html";	//模板后缀
+    private boolean checkTemplate = true;
+    private boolean checkTemplateLocation = true;
+    private String prefix = "classpath:/templates/";
+    private String suffix = ".html";
+    private String mode = "HTML";
+```
 
 只要我们把HTML页面放在classpath:/templates/，thymeleaf就能自动渲染；
+
+自动配好的策略
+
+- 1、所有thymeleaf的配置值都在 ThymeleafProperties
+- 2、配置好了 **SpringTemplateEngine** 
+- **3、配好了** **ThymeleafViewResolver** 
+- 4、我们只需要直接开发页面
 
 使用：
 
@@ -5195,107 +5217,112 @@ SpringBoot推荐的Thymeleaf；
 1. th:text；改变当前元素里面的文本内容；
 
 	th：任意html属性；来替换原生属性的值
+	
+	属性优先级
 
-
-	![](http://120.77.237.175:9080/photos/springboot/33.png)
+![](http://120.77.237.175:9080/photos/springboot/33.png)
 
 2. 表达式
 
-		Simple expressions:（表达式语法）
-		    Variable Expressions: ${...}：获取变量值；OGNL；
-		    		1）、获取对象的属性、调用方法
-		    		2）、使用内置的基本对象：
-		    			#ctx : the context object.
-		    			#vars: the context variables.
-		                #locale : the context locale.
-		                #request : (only in Web Contexts) the HttpServletRequest object.
-		                #response : (only in Web Contexts) the HttpServletResponse object.
-		                #session : (only in Web Contexts) the HttpSession object.
-		                #servletContext : (only in Web Contexts) the ServletContext object.
-		                
-		                ${session.foo}
-		            3）、内置的一些工具对象：
-		#execInfo : information about the template being processed.
-		#messages : methods for obtaining externalized messages inside variables expressions, in the same way as they would be obtained using #{…} syntax.
-		#uris : methods for escaping parts of URLs/URIs
-		#conversions : methods for executing the configured conversion service (if any).
-		#dates : methods for java.util.Date objects: formatting, component extraction, etc.
-		#calendars : analogous to #dates , but for java.util.Calendar objects.
-		#numbers : methods for formatting numeric objects.
-		#strings : methods for String objects: contains, startsWith, prepending/appending, etc.
-		#objects : methods for objects in general.
-		#bools : methods for boolean evaluation.
-		#arrays : methods for arrays.
-		#lists : methods for lists.
-		#sets : methods for sets.
-		#maps : methods for maps.
-		#aggregates : methods for creating aggregates on arrays or collections.
-		#ids : methods for dealing with id attributes that might be repeated (for example, as a result of an iteration).
-		
-		    Selection Variable Expressions: *{...}：选择表达式：和${}在功能上是一样；
-		    	补充：配合 th:object="${session.user}：
-		   <div th:object="${session.user}">
-		    <p>Name: <span th:text="*{firstName}">Sebastian</span>.</p>
-		    <p>Surname: <span th:text="*{lastName}">Pepper</span>.</p>
-		    <p>Nationality: <span th:text="*{nationality}">Saturn</span>.</p>
-		    </div>
-		    
-		    Message Expressions: #{...}：获取国际化内容
-		    Link URL Expressions: @{...}：定义URL；
-		    		@{/order/process(execId=${execId},execType='FAST')}
-		    Fragment Expressions: ~{...}：片段引用表达式
-		    		<div th:insert="~{commons :: main}">...</div>
-		    		
-		Literals（字面量）
-		      Text literals: 'one text' , 'Another one!' ,…
-		      Number literals: 0 , 34 , 3.0 , 12.3 ,…
-		      Boolean literals: true , false
-		      Null literal: null
-		      Literal tokens: one , sometext , main ,…
-		Text operations:（文本操作）
-		    String concatenation: +
-		    Literal substitutions: |The name is ${name}|
-		Arithmetic operations:（数学运算）
-		    Binary operators: + , - , * , / , %
-		    Minus sign (unary operator): -
-		Boolean operations:（布尔运算）
-		    Binary operators: and , or
-		    Boolean negation (unary operator): ! , not
-		Comparisons and equality:（比较运算）
-		    Comparators: > , < , >= , <= ( gt , lt , ge , le )
-		    Equality operators: == , != ( eq , ne )
-		Conditional operators:条件运算（三元运算符）
-		    If-then: (if) ? (then)
-		    If-then-else: (if) ? (then) : (else)
-		    Default: (value) ?: (defaultvalue)
-		Special tokens:
-		    No-Operation: _ 
+	```html
+	Simple expressions:（表达式语法）
+	    Variable Expressions: ${...}：获取变量值；OGNL；
+	    		1）、获取对象的属性、调用方法
+	    		2）、使用内置的基本对象：
+	    			#ctx : the context object.
+	    			#vars: the context variables.
+	                #locale : the context locale.
+	                #request : (only in Web Contexts) the HttpServletRequest object.
+	                #response : (only in Web Contexts) the HttpServletResponse object.
+	                #session : (only in Web Contexts) the HttpSession object.
+	                #servletContext : (only in Web Contexts) the ServletContext object.
+	                
+	                ${session.foo}
+	            3）、内置的一些工具对象：
+	                #execInfo : information about the template being processed.
+	                #messages : methods for obtaining externalized messages inside variables expressions, in the same way as they would be obtained using #{…} syntax.
+	                #uris : methods for escaping parts of URLs/URIs
+	                #conversions : methods for executing the configured conversion service (if any).
+	                #dates : methods for java.util.Date objects: formatting, component extraction, etc.
+	                #calendars : analogous to #dates , but for java.util.Calendar objects.
+	                #numbers : methods for formatting numeric objects.
+	                #strings : methods for String objects: contains, startsWith, prepending/appending, etc.
+	                #objects : methods for objects in general.
+	                #bools : methods for boolean evaluation.
+	                #arrays : methods for arrays.
+	                #lists : methods for lists.
+	                #sets : methods for sets.
+	                #maps : methods for maps.
+	                #aggregates : methods for creating aggregates on arrays or collections.
+	                #ids : methods for dealing with id attributes that might be repeated (for example, as a result of an iteration).
+	
+	    Selection Variable Expressions: *{...}：选择表达式：和${}在功能上是一样；
+	    	补充：配合 th:object="${session.user}：
+	   <div th:object="${session.user}">
+	        <p>Name: <span th:text="*{firstName}">Sebastian</span>.</p>
+	        <p>Surname: <span th:text="*{lastName}">Pepper</span>.</p>
+	        <p>Nationality: <span th:text="*{nationality}">Saturn</span>.</p>
+	    </div>
+	    
+	    Message Expressions: #{...}：获取国际化内容
+	    Link URL Expressions: @{...}：定义URL；生成的链接会自带有访问路径,如果在配置里配置了server.servlet.context-path=xxx,当访问路径变更了,无需每个链接重新配置,SpringBoot会自动生成前缀路径
+	    		@{/order/process(execId=${execId},execType='FAST')}
+	    Fragment Expressions: ~{...}：片段引用表达式
+	    		<div th:insert="~{commons :: main}">...</div>
+	    		
+	Literals（字面量）
+	      Text literals: 'one text' , 'Another one!' ,…
+	      Number literals: 0 , 34 , 3.0 , 12.3 ,…
+	      Boolean literals: true , false
+	      Null literal: null
+	      Literal tokens: one , sometext , main ,…
+	Text operations:（文本操作）
+	    String concatenation: +
+	    Literal substitutions: |The name is ${name}|
+	Arithmetic operations:（数学运算）
+	    Binary operators: + , - , * , / , %
+	    Minus sign (unary operator): -
+	Boolean operations:（布尔运算）
+	    Binary operators: and , or
+	    Boolean negation (unary operator): ! , not
+	Comparisons and equality:（比较运算）
+	    Comparators: > , < , >= , <= ( gt , lt , ge , le )
+	    Equality operators: == , != ( eq , ne )
+	Conditional operators:条件运算（三元运算符）
+	    If-then: (if) ? (then)
+	    If-then-else: (if) ? (then) : (else)
+	    Default: (value) ?: (defaultvalue)
+	Special tokens:
+	    No-Operation: _ 
+	```
 
 ---
 
-		<!DOCTYPE html>
-		<!--引入thymeleaf标签-->
-		<html lang="en" xmlns:th="http://www.thymeleaf.org">
-		<head>
-		    <meta charset="UTF-8">
-		    <title>success</title>
-		</head>
-		<body>
-		<!--th:text 将p里面的文本内容设置为 -->
-		<!--th:text进行了转义-->
-		<p th:text="${hello}">欢迎</p>
-		<!--th:utext不进行转义-->
-		<p th:utext="${hello}">欢迎</p>
-		
-		<hr>
-		<!--th:each会迭代当前的标签,因此要把迭代的内容标注在所需迭代的标签里-->
-		<h1 th:text="${user}" th:each="user:${users}"></h1>
-		<hr/>
-		<ul>
-		    <li th:each="user:${users}">[[${user}]]</li>
-		</ul>
-		</body>
-		</html>
+```html
+	<!DOCTYPE html>
+	<!--引入thymeleaf标签-->
+	<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<head>
+	    <meta charset="UTF-8">
+	    <title>success</title>
+	</head>
+	<body>
+	<!--th:text 将p里面的文本内容设置为 -->
+	<!--th:text进行了转义-->
+	<p th:text="${hello}">欢迎</p>
+	<!--th:utext不进行转义-->
+	<p th:utext="${hello}">欢迎</p>
+	
+	<hr>
+	<!--th:each会迭代当前的标签,因此要把迭代的内容标注在所需迭代的标签里-->
+	<h1 th:text="${user}" th:each="user:${users}"></h1>
+	<hr/>
+	<ul>
+	    <li th:each="user:${users}">[[${user}]]</li>
+	</ul>
+	</body>
+	</html>
+```
 
 **效果如下**:
 
@@ -6171,15 +6198,19 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 
 3. `EmpController`添加映射方法
 
-		   //员工添加页面
-		    @GetMapping("/emp")
-		    public String toAddEmpPage(Model model)
-		    {
-		        //来到添加页面,查出所有的部门，在页面显示
-		        Collection<Department> departments = departmentDao.getDepartments();
-		        model.addAttribute("deps",departments);
-		        return "/emp/add";
-		    }
+      ```java
+       //员工添加页面
+      	    @GetMapping("/emp")
+      	    public String toAddEmpPage(Model model)
+      	    {
+      	        //来到添加页面,查出所有的部门，在页面显示
+      	        Collection<Department> departments = departmentDao.getDepartments();
+      	        model.addAttribute("deps",departments);
+      	        return "/emp/add";
+      	    }
+      ```
+
+      
 
 4. 修改页面遍历添加下拉选项
 
@@ -6264,22 +6295,25 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 
 3. Controller转发到编辑页面，回显员工信息
 
-	    //来到修改页面，查出当前员工，在页面回显
-	    @GetMapping("/emp/{id}")
-	    public String toEditEmpPage(@PathVariable("id") Integer id,Model model)
-	    {
-	        //页面要显示所有的部门列表
-	        Collection<Department> departments = departmentDao.getDepartments();
-	        Employee employee = employeeDao.get(id);
-	        model.addAttribute("emp",employee);
-	        model.addAttribute("deps",departments);
-	        //回到修改页面(add是一个修改添加二合一的页面);
-	        return "/emp/add";
-	    }
+   ```java
+   //来到修改页面，查出当前员工，在页面回显
+   @GetMapping("/emp/{id}")
+   public String toEditEmpPage(@PathVariable("id") Integer id,Model model)
+   {
+       //页面要显示所有的部门列表
+       Collection<Department> departments = departmentDao.getDepartments();
+       Employee employee = employeeDao.get(id);
+       model.addAttribute("emp",employee);
+       model.addAttribute("deps",departments);
+       //回到修改页面(add是一个修改添加二合一的页面);
+       return "/emp/add";
+   }
+   ```
 
 4. 提交表单修改员工信息
 
-		 //员工修改；需要提交员工id；
+		```java
+	 //员工修改；需要提交员工id；
 	    @PutMapping("/emp")
 	    public String editEmp(Employee employee)
 	    {
@@ -6287,6 +6321,9 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 	        System.out.println(employee);
 	        return "redirect:/emps";
 	    }
+	```
+	
+	
 
 
 #### 删除员工 ####
