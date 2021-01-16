@@ -19,6 +19,7 @@
         <module name="springboot-data-jpa" />
         <module name="springboot-web" />
         <module name="springboot-config" />
+        <module name="SpringBoot-thymeleaf" />
         <module name="springboot-annotation" />
         <module name="springboot-config02" />
         <module name="springboot-data-mybatis" />
@@ -39,6 +40,7 @@
       <module name="springboot-starter" target="1.8" />
       <module name="springboot-starter-define" target="1.8" />
       <module name="springboot-starter-define-configure" target="1.8" />
+      <module name="SpringBoot-thymeleaf" target="1.8" />
       <module name="springboot-web" target="1.8" />
       <module name="springboot-web-jsp" target="1.8" />
       <module name="springboot-web-restful" target="1.8" />
@@ -48,6 +50,7 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="SpringBoot-Helloworld" options="-parameters" />
+      <module name="SpringBoot-thymeleaf" options="-parameters" />
       <module name="springboot-Web02" options="-parameters" />
       <module name="springboot-annotation" options="-parameters" />
       <module name="springboot-config" options="-parameters" />

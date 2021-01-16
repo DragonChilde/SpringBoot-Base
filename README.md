@@ -5358,12 +5358,901 @@ Spring Boot 自动配置好了SpringMVC
 如果您想完全掌控 Spring MVC，可以添加自定义注解了 `@EnableWebMvc` 的 `@Configuration` 配置类。
 
 
-#### 视图解析器 ####
+#### 视图解析器原理 ####
+
+1. 目标方法处理的过程中，所有数据都会被放在 **ModelAndViewContainer 里面。包括数据和视图地址**
+
+2. 方法的参数是一个自定义类型对象（从请求参数中确定的），把他重新放在 **ModelAndViewContainer** 
+3. 任何目标方法执行完成以后都会返回 ModelAndView（数据和视图地址）。
+4. processDispatchResult  处理派发结果（页面改如何响应）**
+
+- 1. **render**(**mv**, request, response); 进行页面渲染逻辑
+
+- - 1. 根据方法的String返回值得到 **View** 对象【定义了页面的渲染逻辑】
+
+- - - 1. 所有的视图解析器尝试是否能根据当前返回值得到**View**对象
+    - 2. 得到了  **redirect:/main.html** --> Thymeleaf new **RedirectView**()
+    - 3. ContentNegotiationViewResolver 里面包含了下面所有的视图解析器，内部还是利用下面所有视图解析器得到视图对象。
+    - 4. view.render(mv.getModelInternal(), request, response);  视图对象调用自定义的render进行页面渲染工作
+
+- - - - **RedirectView 如何渲染【重定向到一个页面】**
+      - **1. 获取目标url地址** 
+      - **2. ****response.sendRedirect(encodedURL);**
+
+​		2. **视图解析：**
+
+- - **返回值以 forward: 开始： new InternalResourceView(forwardUrl); -->  转发** **request.getRequestDispatcher(path).forward(request, response);** 
+  - **返回值以** **redirect: 开始：** **new RedirectView() --》 render就是重定向** 
+  - **返回值是普通字符串： new ThymeleafView（）--->** 
+
+##### render处理原理
+
+```java
+//请求进来,与前面的请求处理参数的原理过程一致,这里不作介绍,详细可看上面的参数处理原理
+//直接跳到ServletInvocableHandlerMethod.invokeAndHandle
+	public void invokeAndHandle(ServletWebRequest webRequest, ModelAndViewContainer mavContainer,
+			Object... providedArgs) throws Exception {
+
+		Object returnValue = invokeForRequest(webRequest, mavContainer, providedArgs);
+		setResponseStatus(webRequest);
+
+		if (returnValue == null) {
+			if (isRequestNotModified(webRequest) || getResponseStatus() != null || mavContainer.isRequestHandled()) {
+				disableContentCachingIfNecessary(webRequest);
+				mavContainer.setRequestHandled(true);
+				return;
+			}
+		}
+		else if (StringUtils.hasText(getResponseStatusReason())) {
+			mavContainer.setRequestHandled(true);
+			return;
+		}
+
+		mavContainer.setRequestHandled(false);
+		Assert.state(this.returnValueHandlers != null, "No return value handlers");
+		try {
+            //请求的是登录的url:/login
+            //寻找适合的返回值解析器,可以进入看下究竟找到哪个处理器,最终找到的是ViewNameMethodReturnValueHandler
+            //可以进入ViewNameMethodReturnValueHandler看下其支持的返回类型
+			this.returnValueHandlers.handleReturnValue(
+					returnValue, getReturnValueType(returnValue), mavContainer, webRequest);
+		}
+		catch (Exception ex) {
+			if (logger.isTraceEnabled()) {
+				logger.trace(formatErrorForReturnValue(returnValue), ex);
+			}
+			throw ex;
+		}
+	}
+
+====================================
+    @Override
+	public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
+			ModelAndViewContainer mavContainer, NativeWebRequest webRequest) throws Exception {
+		//继续进入这里,最终找到ViewNameMethodReturnValueHandler处理器
+		HandlerMethodReturnValueHandler handler = selectHandler(returnValue, returnType);
+		if (handler == null) {
+			throw new IllegalArgumentException("Unknown return value type: " + returnType.getParameterType().getName());
+		}
+    	//进入这里,看下如何处理其返回值
+		handler.handleReturnValue(returnValue, returnType, mavContainer, webRequest);
+	}
+
+====================================
+    //根据下面的判断,可以看到其解析器支持返回为void或者是字符串的返回类型
+    public class ViewNameMethodReturnValueHandler implements HandlerMethodReturnValueHandler {
+     ...
+         @Override
+        public boolean supportsReturnType(MethodParameter returnType) {
+            Class<?> paramType = returnType.getParameterType();
+            return (void.class == paramType || CharSequence.class.isAssignableFrom(paramType));
+        }
+        
+        @Override
+        public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
+                ModelAndViewContainer mavContainer, NativeWebRequest webRequest) throws Exception {
+
+            if (returnValue instanceof CharSequence) {
+                //把返回值转为String类型
+                String viewName = returnValue.toString();
+                //把视图名放到ModelAndViewContainer容器里
+                mavContainer.setViewName(viewName);
+                //继续进入这里,看如何判断视图名判断为true
+                if (isRedirectViewName(viewName)) {
+                    //这里设置转发的传感器
+                    mavContainer.setRedirectModelScenario(true);
+                }
+            }
+            else if (returnValue != null) {
+                // should not happen
+                throw new UnsupportedOperationException("Unexpected return type: " +
+                        returnType.getParameterType().getName() + " in method: " + returnType.getMethod());
+            }
+        }
+     ...
+    }
+
+==============================
+    protected boolean isRedirectViewName(String viewName) {
+    //匹配视图名是否有redirect路径,或者是否以"redirect:"开头,因此,为什么可以重定向,是因为必须以redirect:开头
+		return (PatternMatchUtils.simpleMatch(this.redirectPatterns, viewName) || viewName.startsWith("redirect:"));
+	}
+```
+
+```java
+//处理完后,进入RequestMappingHandlerAdapter.invokeHandlerMethod里
+//会看到所有的处理都放在mavContainer里,继续进入,其容器包含的内容如下图,会把我们自定义的参数也放在容器里
+return getModelAndView(mavContainer, modelFactory, webRequest);
+
+==================================
+    @Nullable
+	private ModelAndView getModelAndView(ModelAndViewContainer mavContainer,
+			ModelFactory modelFactory, NativeWebRequest webRequest) throws Exception {
+		//更新Model
+		modelFactory.updateModel(webRequest, mavContainer);
+		if (mavContainer.isRequestHandled()) {
+			return null;
+		}
+    	//这里获取的Model就是方法里的Model ,  public String dynamic_table(@RequestParam(value="pn",defaultValue = "1") Integer pn,Model model),Model里我们没放东西,因此这里获取的结果为0
+		ModelMap model = mavContainer.getModel();
+    //把获取到的视图名redirect:/main.html,转为ModelAndView类型
+		ModelAndView mav = new ModelAndView(mavContainer.getViewName(), model, mavContainer.getStatus());
+		if (!mavContainer.isViewReference()) {
+			mav.setView((View) mavContainer.getView());
+		}
+    //判断model是否为RedirectAttributes类型,因此,可知public String dynamic_table(@RequestParam(value="pn",defaultValue = "1") Integer pn,Model model)方法里不单可以使用Model,也可以用RedirectAttributes
+		if (model instanceof RedirectAttributes) {
+			Map<String, ?> flashAttributes = ((RedirectAttributes) model).getFlashAttributes();
+			HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
+			if (request != null) {
+				RequestContextUtils.getOutputFlashMap(request).putAll(flashAttributes);
+			}
+		}
+    //因此,可知,无论结果如何,都会返回ModelAndView为结果
+		return mav;
+	}
+
+```
+
+mavContainer窗口包含的所有要解析的数据
+
+![](http://120.77.237.175:9080/photos/springboot/111.jpg)
+
+```java
+	protected void doDispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
+		HttpServletRequest processedRequest = request;
+		HandlerExecutionChain mappedHandler = null;
+		boolean multipartRequestParsed = false;
+
+		WebAsyncManager asyncManager = WebAsyncUtils.getAsyncManager(request);
+
+		try {
+			ModelAndView mv = null;
+			Exception dispatchException = null;
+
+			try {
+				processedRequest = checkMultipart(request);
+				multipartRequestParsed = (processedRequest != request);
+
+				// Determine handler for the current request.
+				mappedHandler = getHandler(processedRequest);
+				if (mappedHandler == null) {
+					noHandlerFound(processedRequest, response);
+					return;
+				}
+
+				// Determine handler adapter for the current request.
+				HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
+
+				// Process last-modified header, if supported by the handler.
+				String method = request.getMethod();
+				boolean isGet = "GET".equals(method);
+				if (isGet || "HEAD".equals(method)) {
+					long lastModified = ha.getLastModified(request, mappedHandler.getHandler());
+					if (new ServletWebRequest(request, response).checkNotModified(lastModified) && isGet) {
+						return;
+					}
+				}
+
+				if (!mappedHandler.applyPreHandle(processedRequest, response)) {
+					return;
+				}
+
+				//根据上面的处理结果,清楚知道最终无论结果如何都会找到ModelAndView为结果
+				mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+
+				if (asyncManager.isConcurrentHandlingStarted()) {
+					return;
+				}
+				//设置默认的视图,进入这里,看下是如何设置的
+				applyDefaultViewName(processedRequest, mv);
+				mappedHandler.applyPostHandle(processedRequest, response, mv);
+			}
+			catch (Exception ex) {
+				dispatchException = ex;
+			}
+			catch (Throwable err) {
+				// As of 4.3, we're processing Errors thrown from handler methods as well,
+				// making them available for @ExceptionHandler methods and other scenarios.
+				dispatchException = new NestedServletException("Handler dispatch failed", err);
+			}
+            //处理派发请求,继续进入这里
+			processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+		}
+		catch (Exception ex) {
+			triggerAfterCompletion(processedRequest, response, mappedHandler, ex);
+		}
+		catch (Throwable err) {
+			triggerAfterCompletion(processedRequest, response, mappedHandler,
+					new NestedServletException("Handler processing failed", err));
+		}
+		finally {
+			if (asyncManager.isConcurrentHandlingStarted()) {
+				// Instead of postHandle and afterCompletion
+				if (mappedHandler != null) {
+					mappedHandler.applyAfterConcurrentHandlingStarted(processedRequest, response);
+				}
+			}
+			else {
+				// Clean up any resources used by a multipart request.
+				if (multipartRequestParsed) {
+					cleanupMultipart(processedRequest);
+				}
+			}
+		}
+	}
+===========================================
+    private void processDispatchResult(HttpServletRequest request, HttpServletResponse response,
+			@Nullable HandlerExecutionChain mappedHandler, @Nullable ModelAndView mv,
+			@Nullable Exception exception) throws Exception {
+
+		boolean errorView = false;
+
+		if (exception != null) {
+			if (exception instanceof ModelAndViewDefiningException) {
+				logger.debug("ModelAndViewDefiningException encountered", exception);
+				mv = ((ModelAndViewDefiningException) exception).getModelAndView();
+			}
+			else {
+				Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
+				mv = processHandlerException(request, response, handler, exception);
+				errorView = (mv != null);
+			}
+		}
+
+		// 判断 ModelAndView 不为空
+		if (mv != null && !mv.wasCleared()) {
+            //判断成功,进行页面渲染,继续进入
+			render(mv, request, response);
+			if (errorView) {
+				WebUtils.clearErrorRequestAttributes(request);
+			}
+		}
+		else {
+			if (logger.isTraceEnabled()) {
+				logger.trace("No view rendering, null ModelAndView returned.");
+			}
+		}
+
+		if (WebAsyncUtils.getAsyncManager(request).isConcurrentHandlingStarted()) {
+			// Concurrent handling started during a forward
+			return;
+		}
+
+		if (mappedHandler != null) {
+			// Exception (if any) is already handled..
+			mappedHandler.triggerAfterCompletion(request, response, null);
+		}
+	}
+
+===========================================
+    	protected void render(ModelAndView mv, HttpServletRequest request, HttpServletResponse response) throws Exception {
+		// 判断国际化的
+		Locale locale =
+				(this.localeResolver != null ? this.localeResolver.resolveLocale(request) : request.getLocale());
+		response.setLocale(locale);
+
+    	//初始化视图,View是个接口,可以进入看下
+		View view;
+		String viewName = mv.getViewName();
+		if (viewName != null) {
+			// 进入这里,看如找视图对象,返回ThymeleafView
+			view = resolveViewName(viewName, mv.getModelInternal(), locale, request);
+			if (view == null) {
+				throw new ServletException("Could not resolve view with name '" + mv.getViewName() +
+						"' in servlet with name '" + getServletName() + "'");
+			}
+		}
+		else {
+			// No need to lookup: the ModelAndView object contains the actual View object.
+			view = mv.getView();
+			if (view == null) {
+				throw new ServletException("ModelAndView [" + mv + "] neither contains a view name nor a " +
+						"View object in servlet with name '" + getServletName() + "'");
+			}
+		}
+
+		// Delegate to the View object for rendering.
+		if (logger.isTraceEnabled()) {
+			logger.trace("Rendering view [" + view + "] ");
+		}
+		try {
+			if (mv.getStatus() != null) {
+				response.setStatus(mv.getStatus().value());
+			}
+            //上面获取到对应的视图对象,接口View定义了如何进行渲染,这里使用ThymeleafView视图对象进行页面渲染,继续进入
+			view.render(mv.getModelInternal(), request, response);
+		}
+		catch (Exception ex) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Error rendering view [" + view + "]", ex);
+			}
+			throw ex;
+		}
+	}
+
+==========================================
+    //视图接口,规定了视图如何渲染,可以看到参数model,和请求对象request,返回对象response
+public interface View {
+    void render(@Nullable Map<String, ?> model, HttpServletRequest request, HttpServletResponse response)
+			throws Exception;
+}
+
+=============================================
+    //遍历寻找可以处理的视图解析器,一共有5个,如下图
+    @Nullable
+	protected View resolveViewName(String viewName, @Nullable Map<String, Object> model,
+			Locale locale, HttpServletRequest request) throws Exception {
+
+		if (this.viewResolvers != null) {
+			for (ViewResolver viewResolver : this.viewResolvers) {
+                //可以进入这里,看是如何处理的
+				View view = viewResolver.resolveViewName(viewName, locale);
+				if (view != null) {
+					return view;
+				}
+			}
+		}
+		return null;
+	}
+
+=======================================
+    //首先找到的ContentNegotiatingViewResolver解析器
+    	public View resolveViewName(String viewName, Locale locale) throws Exception {
+    //获取所有attributes值
+		RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+		Assert.state(attrs instanceof ServletRequestAttributes, "No current ServletRequestAttributes");
+    //获取浏览器所支持的媒体协议类型
+		List<MediaType> requestedMediaTypes = getMediaTypes(((ServletRequestAttributes) attrs).getRequest());
+		if (requestedMediaTypes != null) {
+            //获取后选视图,进入这里
+			List<View> candidateViews = getCandidateViews(viewName, locale, requestedMediaTypes);
+            //获取最佳匹配
+			View bestView = getBestView(candidateViews, requestedMediaTypes, attrs);
+			if (bestView != null) {
+				return bestView;
+			}
+		}
+
+		String mediaTypeInfo = logger.isDebugEnabled() && requestedMediaTypes != null ?
+				" given " + requestedMediaTypes.toString() : "";
+
+		if (this.useNotAcceptableStatusCode) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Using 406 NOT_ACCEPTABLE" + mediaTypeInfo);
+			}
+			return NOT_ACCEPTABLE_VIEW;
+		}
+		else {
+			logger.debug("View remains unresolved" + mediaTypeInfo);
+			return null;
+		}
+	}
+
+==========================================
+    //注解:ContentNegotiationViewResolver里面包含了所有视图解析器,如下图,内部还是利用下面所有视图解析器得到视图对象。
+   private List<View> getCandidateViews(String viewName, Locale locale, List<MediaType> requestedMediaTypes)
+			throws Exception {
+
+		List<View> candidateViews = new ArrayList<>();
+		if (this.viewResolvers != null) {
+			Assert.state(this.contentNegotiationManager != null, "No ContentNegotiationManager set");
+            //根据媒体协议的视图解析器遍历(协议里也会带有视图解析器)
+			for (ViewResolver viewResolver : this.viewResolvers) {
+                //可以进去看下是如何判断解析的
+				View view = viewResolver.resolveViewName(viewName, locale);
+				if (view != null) {
+					candidateViews.add(view);
+				}
+				for (MediaType requestedMediaType : requestedMediaTypes) {
+					List<String> extensions = this.contentNegotiationManager.resolveFileExtensions(requestedMediaType);
+					for (String extension : extensions) {
+						String viewNameWithExtension = viewName + '.' + extension;
+						view = viewResolver.resolveViewName(viewNameWithExtension, locale);
+						if (view != null) {
+							candidateViews.add(view);
+						}
+					}
+				}
+			}
+		}
+		if (!CollectionUtils.isEmpty(this.defaultViews)) {
+			candidateViews.addAll(this.defaultViews);
+		}
+		return candidateViews;
+	}
+
+=====================================
+    //首先找到的是BeanNameViewResolver不符合条件,判断的是否包含Bean,
+    //其次找到的是ThymeleafView
+	@Override
+	@Nullable
+	public View resolveViewName(String viewName, Locale locale) throws Exception {
+		if (!isCache()) {
+            //继续进入这里
+			return createView(viewName, locale);
+		}
+		else {
+			Object cacheKey = getCacheKey(viewName, locale);
+			View view = this.viewAccessCache.get(cacheKey);
+			if (view == null) {
+				synchronized (this.viewCreationCache) {
+					view = this.viewCreationCache.get(cacheKey);
+					if (view == null) {
+						// Ask the subclass to create the View object.
+						view = createView(viewName, locale);
+						if (view == null && this.cacheUnresolved) {
+							view = UNRESOLVED_VIEW;
+						}
+						if (view != null && this.cacheFilter.filter(view, viewName, locale)) {
+							this.viewAccessCache.put(cacheKey, view);
+							this.viewCreationCache.put(cacheKey, view);
+						}
+					}
+				}
+			}
+			else {
+				if (logger.isTraceEnabled()) {
+					logger.trace(formatKey(cacheKey) + "served from cache");
+				}
+			}
+			return (view != UNRESOLVED_VIEW ? view : null);
+		}
+	}
+
+=================================================
+    //进入ThymeleafViewResolver看如何创建视图
+    @Override
+    protected View createView(final String viewName, final Locale locale) throws Exception {
+        // First possible call to check "viewNames": before processing redirects and forwards
+        if (!this.alwaysProcessRedirectAndForward && !canHandle(viewName, locale)) {
+            vrlogger.trace("[THYMELEAF] View \"{}\" cannot be handled by ThymeleafViewResolver. Passing on to the next resolver in the chain.", viewName);
+            return null;
+        }
+        // 判断视图是否以redirect:开头,判断为true进入,
+        if (viewName.startsWith(REDIRECT_URL_PREFIX)) {
+            vrlogger.trace("[THYMELEAF] View \"{}\" is a redirect, and will not be handled directly by ThymeleafViewResolver.", viewName);
+            final String redirectUrl = viewName.substring(REDIRECT_URL_PREFIX.length(), viewName.length());
+            final RedirectView view = new RedirectView(redirectUrl, isRedirectContextRelative(), isRedirectHttp10Compatible());
+            return (View) getApplicationContext().getAutowireCapableBeanFactory().initializeBean(view, viewName);
+        }
+        // 判断视图是否以forward:开头
+        if (viewName.startsWith(FORWARD_URL_PREFIX)) {
+            // The "forward:" prefix will actually create a Servlet/JSP view, and that's precisely its aim per the Spring
+            // documentation. See http://docs.spring.io/spring-framework/docs/4.2.4.RELEASE/spring-framework-reference/html/mvc.html#mvc-redirecting-forward-prefix
+            vrlogger.trace("[THYMELEAF] View \"{}\" is a forward, and will not be handled directly by ThymeleafViewResolver.", viewName);
+            final String forwardUrl = viewName.substring(FORWARD_URL_PREFIX.length(), viewName.length());
+            //InternalResourceView其底层就是使用request.getRequestDispatcher(path).forward(request, response);进行重定向
+            return new InternalResourceView(forwardUrl);
+        }
+        // Second possible call to check "viewNames": after processing redirects and forwards
+        if (this.alwaysProcessRedirectAndForward && !canHandle(viewName, locale)) {
+            vrlogger.trace("[THYMELEAF] View \"{}\" cannot be handled by ThymeleafViewResolver. Passing on to the next resolver in the chain.", viewName);
+            return null;
+        }
+        vrlogger.trace("[THYMELEAF] View {} will be handled by ThymeleafViewResolver and a " +
+                        "{} instance will be created for it", viewName, getViewClass().getSimpleName());
+    	//上面都不符合,直接进入加载视图,进入看如果是返回字符串类型,是如何加载视图的
+        return loadView(viewName, locale);
+    }
+```
+
+视图解析器
+
+![](http://120.77.237.175:9080/photos/springboot/112.jpg)
+
+媒体协议里带有的视图解析器
+
+![](http://120.77.237.175:9080/photos/springboot/113.jpg)
+
+`ContentNegotiationViewResolver`包含了所有下面的视图解析器
+
+![](http://120.77.237.175:9080/photos/springboot/114.jpg)
+
+```java
+
+	@Override
+	public void render(@Nullable Map<String, ?> model, HttpServletRequest request,
+			HttpServletResponse response) throws Exception {
+
+		if (logger.isDebugEnabled()) {
+			logger.debug("View " + formatViewName() +
+					", model " + (model != null ? model : Collections.emptyMap()) +
+					(this.staticAttributes.isEmpty() ? "" : ", static attributes " + this.staticAttributes));
+		}
+
+		Map<String, Object> mergedModel = createMergedOutputModel(model, request, response);
+		prepareResponse(request, response);
+        //继续进入这里
+		renderMergedOutputModel(mergedModel, getRequestToExpose(request), response);
+	}
+==================================================================
+    	@Override
+	protected void renderMergedOutputModel(Map<String, Object> model, HttpServletRequest request,
+			HttpServletResponse response) throws IOException {
+		//继续进行这里,看如何获取目标URL
+		String targetUrl = createTargetUrl(model, request);
+		targetUrl = updateTargetUrl(targetUrl, model, request, response);
+
+		// Save flash attributes
+		RequestContextUtils.saveOutputFlashMap(targetUrl, request, response);
+
+		// 继续进入这里,看如何进行转发
+		sendRedirect(request, response, targetUrl, this.http10Compatible);
+	}
+
+=================================================
+    	protected final String createTargetUrl(Map<String, Object> model, HttpServletRequest request)
+			throws UnsupportedEncodingException {
+
+		// Prepare target URL.
+		StringBuilder targetUrl = new StringBuilder();
+    	//获取目标URL
+		String url = getUrl();
+		Assert.state(url != null, "'url' not set");
+
+		if (this.contextRelative && getUrl().startsWith("/")) {
+			// Do not apply context path to relative URLs.
+			targetUrl.append(getContextPath(request));
+		}
+		targetUrl.append(getUrl());
+		//下面是进行处理格式化
+		String enc = this.encodingScheme;
+		if (enc == null) {
+			enc = request.getCharacterEncoding();
+		}
+		if (enc == null) {
+			enc = WebUtils.DEFAULT_CHARACTER_ENCODING;
+		}
+
+		if (this.expandUriTemplateVariables && StringUtils.hasText(targetUrl)) {
+			Map<String, String> variables = getCurrentRequestUriVariables(request);
+			targetUrl = replaceUriTemplateVariables(targetUrl.toString(), model, variables, enc);
+		}
+   		 //判断是否有转发参数
+		if (isPropagateQueryProperties()) {
+			appendCurrentQueryParams(targetUrl, request);
+		}
+		if (this.exposeModelAttributes) {
+			appendQueryProperties(targetUrl, model, enc);
+		}
+
+		return targetUrl.toString();
+	}
+
+========================================================================================
+    protected void sendRedirect(HttpServletRequest request, HttpServletResponse response,
+			String targetUrl, boolean http10Compatible) throws IOException {
+
+		String encodedURL = (isRemoteHost(targetUrl) ? targetUrl : response.encodeRedirectURL(targetUrl));
+		if (http10Compatible) {
+			HttpStatus attributeStatusCode = (HttpStatus) request.getAttribute(View.RESPONSE_STATUS_ATTRIBUTE);
+			if (this.statusCode != null) {
+				response.setStatus(this.statusCode.value());
+				response.setHeader("Location", encodedURL);
+			}
+			else if (attributeStatusCode != null) {
+				response.setStatus(attributeStatusCode.value());
+				response.setHeader("Location", encodedURL);
+			}
+			else {
+				// 最终结果就是这里,使用的就是原生的response.sendRedirect方法进行重定向
+				response.sendRedirect(encodedURL);
+			}
+		}
+		else {
+			HttpStatus statusCode = getHttp11StatusCode(request, response, targetUrl);
+			response.setStatus(statusCode.value());
+			response.setHeader("Location", encodedURL);
+		}
+	}
+```
+
+##### 加载视图原理
+
+前面处理流程和render基本一样,只在找到视图模型后如何处理加载
+
+```java
+	@Override
+    protected View loadView(final String viewName, final Locale locale) throws Exception {
+        
+        final AutowireCapableBeanFactory beanFactory = getApplicationContext().getAutowireCapableBeanFactory();
+        //先判断视图名是否在容器中
+        final boolean viewBeanExists = beanFactory.containsBean(viewName);
+        
+        final Class<?> viewBeanType = viewBeanExists? beanFactory.getType(viewName) : null;
+
+        final AbstractThymeleafView view;
+        if (viewBeanExists && viewBeanType != null && AbstractThymeleafView.class.isAssignableFrom(viewBeanType)) {
+            // AppCtx has a bean with name == viewName, and it is a View bean. So let's use it as a prototype!
+            //
+            // This can mean two things: if the bean has been defined with scope "prototype", we will just use it.
+            // If it hasn't we will create a new instance of the view class and use its properties in order to
+            // configure this view instance (so that we don't end up using the same bean from several request threads).
+            //
+            // Note that, if Java-based configuration is used, using @Scope("prototype") would be the only viable
+            // possibility here.
+
+            final BeanDefinition viewBeanDefinition =
+                    (beanFactory instanceof ConfigurableListableBeanFactory ?
+                            ((ConfigurableListableBeanFactory)beanFactory).getBeanDefinition(viewName) :
+                            null);
+
+            if (viewBeanDefinition == null || !viewBeanDefinition.isPrototype()) {
+                // No scope="prototype", so we will just apply its properties. This should only happen with XML config.
+                final AbstractThymeleafView viewInstance = BeanUtils.instantiateClass(getViewClass());
+                view = (AbstractThymeleafView) beanFactory.configureBean(viewInstance, viewName);
+            } else {
+                // This is a prototype bean. Use it as such.
+                view = (AbstractThymeleafView) beanFactory.getBean(viewName);
+            }
+
+        } else {
+			//使用反射,创建ThymeleafView视图对象
+            final AbstractThymeleafView viewInstance = BeanUtils.instantiateClass(getViewClass());
+
+            if (viewBeanExists && viewBeanType == null) {
+                // AppCtx has a bean with name == viewName, but it is an abstract bean. We still can use it as a prototype.
+
+                // The AUTOWIRE_NO mode applies autowiring only through annotations
+                beanFactory.autowireBeanProperties(viewInstance, AutowireCapableBeanFactory.AUTOWIRE_NO, false);
+                // A bean with this name exists, so we apply its properties
+                beanFactory.applyBeanPropertyValues(viewInstance, viewName);
+                // Finally, we let Spring do the remaining initializations (incl. proxifying if needed)
+                view = (AbstractThymeleafView) beanFactory.initializeBean(viewInstance, viewName);
+
+            } else {
+                // Either AppCtx has no bean with name == viewName, or it is of an incompatible class. No prototyping done.
+
+                // The AUTOWIRE_NO mode applies autowiring only through annotations
+                beanFactory.autowireBeanProperties(viewInstance, AutowireCapableBeanFactory.AUTOWIRE_NO, false);
+                // Finally, we let Spring do the remaining initializations (incl. proxifying if needed)
+                view = (AbstractThymeleafView) beanFactory.initializeBean(viewInstance, viewName);
+
+            }
+
+        }
+
+        view.setTemplateEngine(getTemplateEngine());
+        view.setStaticVariables(getStaticVariables());
+
+
+        // We give view beans the opportunity to specify the template name to be used
+        if (view.getTemplateName() == null) {
+            view.setTemplateName(viewName);
+        }
+
+        if (!view.isForceContentTypeSet()) {
+            view.setForceContentType(getForceContentType());
+        }
+        if (!view.isContentTypeSet() && getContentType() != null) {
+            view.setContentType(getContentType());
+        }
+        if (view.getLocale() == null && locale != null) {
+            view.setLocale(locale);
+        }
+        if (view.getCharacterEncoding() == null && getCharacterEncoding() != null) {
+            view.setCharacterEncoding(getCharacterEncoding());
+        }
+        if (!view.isProducePartialOutputWhileProcessingSet()) {
+            view.setProducePartialOutputWhileProcessing(getProducePartialOutputWhileProcessing());
+        }
+        
+        return view;
+        
+    }
+//最终找到视图对象返回到DispatcherServlet进入doDispatch()下的view.render(mv.getModelInternal(), request, response);看如何渲染
+=======================================
+    public void render(final Map<String, ?> model, final HttpServletRequest request, final HttpServletResponse response)
+            throws Exception {
+    //继续进入
+        renderFragment(this.markupSelectors, model, request, response);
+    }
+
+    protected void renderFragment(final Set<String> markupSelectorsToRender, final Map<String, ?> model, final HttpServletRequest request,
+            final HttpServletResponse response)
+            throws Exception {
+
+        final ServletContext servletContext = getServletContext() ;
+        //获取模板名
+        final String viewTemplateName = getTemplateName();
+        final ISpringTemplateEngine viewTemplateEngine = getTemplateEngine();
+
+        if (viewTemplateName == null) {
+            throw new IllegalArgumentException("Property 'templateName' is required");
+        }
+        if (getLocale() == null) {
+            throw new IllegalArgumentException("Property 'locale' is required");
+        }
+        if (viewTemplateEngine == null) {
+            throw new IllegalArgumentException("Property 'templateEngine' is required");
+        }
+
+
+        final Map<String, Object> mergedModel = new HashMap<String, Object>(30);
+        final Map<String, Object> templateStaticVariables = getStaticVariables();
+        if (templateStaticVariables != null) {
+            mergedModel.putAll(templateStaticVariables);
+        }
+        if (pathVariablesSelector != null) {
+            @SuppressWarnings("unchecked")
+            final Map<String, Object> pathVars = (Map<String, Object>) request.getAttribute(pathVariablesSelector);
+            if (pathVars != null) {
+                mergedModel.putAll(pathVars);
+            }
+        }
+        //把要输出到页面内容全部加载到这
+        if (model != null) {
+            mergedModel.putAll(model);
+        }
+
+        final ApplicationContext applicationContext = getApplicationContext();
+
+        final RequestContext requestContext =
+                new RequestContext(request, response, getServletContext(), mergedModel);
+        final SpringWebMvcThymeleafRequestContext thymeleafRequestContext =
+                new SpringWebMvcThymeleafRequestContext(requestContext, request);
+
+        // For compatibility with ThymeleafView
+        addRequestContextAsVariable(mergedModel, SpringContextVariableNames.SPRING_REQUEST_CONTEXT, requestContext);
+        // For compatibility with AbstractTemplateView
+        addRequestContextAsVariable(mergedModel, AbstractTemplateView.SPRING_MACRO_REQUEST_CONTEXT_ATTRIBUTE, requestContext);
+        // Add the Thymeleaf RequestContext wrapper that we will be using in this dialect (the bare RequestContext
+        // stays in the context to for compatibility with other dialects)
+        mergedModel.put(SpringContextVariableNames.THYMELEAF_REQUEST_CONTEXT, thymeleafRequestContext);
+
+
+        // Expose Thymeleaf's own evaluation context as a model variable
+        //
+        // Note Spring's EvaluationContexts are NOT THREAD-SAFE (in exchange for SpelExpressions being thread-safe).
+        // That's why we need to create a new EvaluationContext for each request / template execution, even if it is
+        // quite expensive to create because of requiring the initialization of several ConcurrentHashMaps.
+        final ConversionService conversionService =
+                (ConversionService) request.getAttribute(ConversionService.class.getName()); // might be null!
+        final ThymeleafEvaluationContext evaluationContext =
+                new ThymeleafEvaluationContext(applicationContext, conversionService);
+        mergedModel.put(ThymeleafEvaluationContext.THYMELEAF_EVALUATION_CONTEXT_CONTEXT_VARIABLE_NAME, evaluationContext);
+
+
+        final IEngineConfiguration configuration = viewTemplateEngine.getConfiguration();
+        final WebExpressionContext context =
+                new WebExpressionContext(configuration, request, response, servletContext, getLocale(), mergedModel);
+
+
+        final String templateName;
+        final Set<String> markupSelectors;
+        if (!viewTemplateName.contains("::")) {
+            // No fragment specified at the template name
+
+            templateName = viewTemplateName;
+            markupSelectors = null;
+
+        } else {
+            // Template name contains a fragment name, so we should parse it as such
+
+            final IStandardExpressionParser parser = StandardExpressions.getExpressionParser(configuration);
+
+            final FragmentExpression fragmentExpression;
+            try {
+                // By parsing it as a standard expression, we might profit from the expression cache
+                fragmentExpression = (FragmentExpression) parser.parseExpression(context, "~{" + viewTemplateName + "}");
+            } catch (final TemplateProcessingException e) {
+                throw new IllegalArgumentException("Invalid template name specification: '" + viewTemplateName + "'");
+            }
+
+            final FragmentExpression.ExecutedFragmentExpression fragment =
+                    FragmentExpression.createExecutedFragmentExpression(context, fragmentExpression);
+
+            templateName = FragmentExpression.resolveTemplateName(fragment);
+            markupSelectors = FragmentExpression.resolveFragments(fragment);
+            final Map<String,Object> nameFragmentParameters = fragment.getFragmentParameters();
+
+            if (nameFragmentParameters != null) {
+
+                if (fragment.hasSyntheticParameters()) {
+                    // We cannot allow synthetic parameters because there is no way to specify them at the template
+                    // engine execution!
+                    throw new IllegalArgumentException(
+                            "Parameters in a view specification must be named (non-synthetic): '" + viewTemplateName + "'");
+                }
+
+                context.setVariables(nameFragmentParameters);
+
+            }
+            //获取协议内容
+            final String templateContentType = getContentType();
+            //获取语言格式
+            final Locale templateLocale = getLocale();
+            final String templateCharacterEncoding = getCharacterEncoding();
+
+
+            final Set<String> processMarkupSelectors;
+            if (markupSelectors != null && markupSelectors.size() > 0) {
+                if (markupSelectorsToRender != null && markupSelectorsToRender.size() > 0) {
+                    throw new IllegalArgumentException(
+                            "A markup selector has been specified (" + Arrays.asList(markupSelectors) + ") for a view " +
+                            "that was already being executed as a fragment (" + Arrays.asList(markupSelectorsToRender) + "). " +
+                            "Only one fragment selection is allowed.");
+                }
+                processMarkupSelectors = markupSelectors;
+            } else {
+                if (markupSelectorsToRender != null && markupSelectorsToRender.size() > 0) {
+                    processMarkupSelectors = markupSelectorsToRender;
+                } else {
+                    processMarkupSelectors = null;
+                }
+            }
+
+
+            response.setLocale(templateLocale);
+
+            if (!getForceContentType()) {
+
+                final String computedContentType =
+                        SpringContentTypeUtils.computeViewContentType(
+                                request,
+                                (templateContentType != null? templateContentType : DEFAULT_CONTENT_TYPE),
+                                (templateCharacterEncoding != null? Charset.forName(templateCharacterEncoding) : null));
+
+                response.setContentType(computedContentType);
+
+            } else {
+                // We will force the content type parameters without trying to make smart assumptions over them
+
+                if (templateContentType != null) {
+                    response.setContentType(templateContentType);
+                } else {
+                    response.setContentType(DEFAULT_CONTENT_TYPE);
+                }
+                if (templateCharacterEncoding != null) {
+                    response.setCharacterEncoding(templateCharacterEncoding);
+                }
+
+            }
+
+            final boolean producePartialOutputWhileProcessing = getProducePartialOutputWhileProcessing();
+
+            // If we have chosen to not output anything until processing finishes, we will use a buffer
+            final Writer templateWriter =
+                    (producePartialOutputWhileProcessing? response.getWriter() : new FastStringWriter(1024));
+			//这里看到一堆writer,写入,然后flush
+            viewTemplateEngine.process(templateName, processMarkupSelectors, context, templateWriter);
+
+            // If a buffer was used, write it to the web server's output buffers all at once
+            if (!producePartialOutputWhileProcessing) {
+                response.getWriter().write(templateWriter.toString());
+                response.getWriter().flush();
+            }
+
+            
+        }
+
+```
 
 视图解析器：根据方法的返回值得到视图对象（View），视图对象决定如何渲染（转发？重定向？）
 
 - 自动配置了ViewResolver
-- ContentNegotiatingViewResolver：组合所有的视图解析器的
+- `ContentNegotiatingViewResolver`：组合所有的视图解析器的
 
 ![](http://120.77.237.175:9080/photos/springboot/35.png)
 
@@ -5374,41 +6263,49 @@ Spring Boot 自动配置好了SpringMVC
 **可以自己给容器中添加一个视图解析器；自动的将其组合进来**
 
 
-	@SpringBootApplication
-	public class SpringbootWebApplication {
-	
-	    public static void main(String[] args) {
-	        SpringApplication.run(SpringbootWebApplication.class, args);
-	    }
-	
-	    @Bean
-	    public ViewResolver myViewReolver()
-	    {
-	        return new MyViewResolver();
-	    }
-	
-	    private static class MyViewResolver implements  ViewResolver{
-	
-	        @Override
-	        public View resolveViewName(String s, Locale locale) throws Exception {
-	            return null;
-	        }
-	    }
-	}
+```java
+@SpringBootApplication
+public class SpringbootWebApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(SpringbootWebApplication.class, args);
+    }
+
+    @Bean
+    public ViewResolver myViewReolver()
+    {
+        return new MyViewResolver();
+    }
+
+    private static class MyViewResolver implements  ViewResolver{
+
+        @Override
+        public View resolveViewName(String s, Locale locale) throws Exception {
+            return null;
+        }
+    }
+}
+```
 
 ![](http://120.77.237.175:9080/photos/springboot/37.jpg)
 
 #### 转换器、格式化器 ####
 
 - Converter：转换器； public String hello(User user)：类型转换使用Converter（表单数据转为user）
+
 - Formatter 格式化器； 2017.12.17===Date；
 
-		 @Bean
+		```java
+	 @Bean
 	    //在配置文件中配置日期格式化的规则
 	    @ConditionalOnProperty(prefix = "spring.mvc", name = "date-format")
 	    public Formatter<Date> dateFormatter() {
 	        return new DateFormatter(this.mvcProperties.getDateFormat());//日期格式化组件
 	    }
+	
+	```
+	
+	```
 
 **自己添加的格式化器转换器，我们只需要放在容器中即可**
 
@@ -5429,13 +6326,15 @@ Spring Boot 自动配置好了SpringMVC
 
 以前的配置文件中的配置
 
-	<mvc:view-controller path="/hello" view-name="success"/>
-	<mvc:interceptors>
-	    <mvc:interceptor>
-	        <mvc:mapping path="/hello"/>
-	        <bean></bean>
-	    </mvc:interceptor>
-	</mvc:interceptors>
+```java
+<mvc:view-controller path="/hello" view-name="success"/>
+<mvc:interceptors>
+    <mvc:interceptor>
+        <mvc:mapping path="/hello"/>
+        <bean></bean>
+    </mvc:interceptor>
+</mvc:interceptors>
+```
 
 **现在编写一个配置类（@Configuration），是WebMvcConfigurer类型；不能标注@EnableWebMvc**
 
@@ -5837,63 +6736,83 @@ template文件加不是静态资源文件夹，默认是无法直接访问的，
 	    }
 	}
 
-#### 拦截器进行登陆检查 ####
+#### 拦截器 ####
+
+1. 编写一个拦截器实现HandlerInterceptor接口
+2. 拦截器注册到容器中（实现WebMvcConfigurer的addInterceptors）
+3. 指定拦截规则【如果是拦截所有，静态资源也会被拦截】
 
 1. 实现拦截器
 
-		/*登录检查*/
-		public class LoginHandleInterceptor implements HandlerInterceptor {
-		
-		    //目标方法执行之前
-		    @Override
-		    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-		
-		        Object user = request.getSession().getAttribute("user");
-		        if(user == null)
-		        {
-		            //未登陆，返回登陆页面
-		            request.setAttribute("msg","没有权限登录!");
-		            request.getRequestDispatcher("/index.html").forward(request,response);
-		            return false;
-		        } else {
-		            //已登陆，放行请求
-		            return true;
-		        }
-		
-		    }
-		
-		    @Override
-		    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
-		
-		    }
-		
-		    @Override
-		    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-		
-		    }
-		}
+   ```java
+   /*登录检查*/
+   public class LoginHandleInterceptor implements HandlerInterceptor {
+   
+       //目标方法执行之前
+       @Override
+       public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+   
+           Object user = request.getSession().getAttribute("user");
+           if(user == null)
+           {
+               //未登陆，返回登陆页面
+               request.setAttribute("msg","没有权限登录!");
+               request.getRequestDispatcher("/index.html").forward(request,response);
+               return false;
+           } else {
+               //已登陆，放行请求
+               return true;
+           }
+   
+       }
+   
+       /**
+        * 目标方法执行完成以后
+        * @param request
+        * @param response
+        * @param handler
+        * @param modelAndView
+        * @throws Exception
+        */
+       @Override
+       public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+   	
+       }
+   
+       /**
+        * 页面渲染以后
+        * @param request
+        * @param response
+        * @param handler
+        * @param ex
+        * @throws Exception
+        */
+       @Override
+       public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+   
+       }
+   }
+   ```
 
 2. 注册拦截器
 
-		@Configuration
-		public class MyConfig implements WebMvcConfigurer {
-		
-		    //定义不拦截路径(把静态资源的路径加入到不拦截的路径之中)
-		    String[] url = {"/","/index","/index.html","/user/login","/asserts/**","/webjars/**"};
-		
-		    @Override
-		    public void addViewControllers(ViewControllerRegistry registry) {
-		        // super.addViewControllers(registry);
-		        //浏览器发送 /atguigu 请求来到 success
-		        registry.addViewController("/").setViewName("login");
-		        registry.addViewController("index").setViewName("login");
-		        registry.addViewController("index.html").setViewName("login");
-		        registry.addViewController("main.html").setViewName("dashboard");
-		    }
+	```java
+	@Configuration
+	public class MyConfig implements WebMvcConfigurer {
 	
+	    //定义不拦截路径(把静态资源的路径加入到不拦截的路径之中)
+	    String[] url = {"/","/index","/index.html","/user/login","/asserts/**","/webjars/**"};
 	
-	​	
-	​	    //注册拦截器
+	    @Override
+	    public void addViewControllers(ViewControllerRegistry registry) {
+	        // super.addViewControllers(registry);
+	        //浏览器发送 /atguigu 请求来到 success
+	        registry.addViewController("/").setViewName("login");
+	        registry.addViewController("index").setViewName("login");
+	        registry.addViewController("index.html").setViewName("login");
+	        registry.addViewController("main.html").setViewName("dashboard");
+	    }
+	      //注册拦截器
 	​	    public void addInterceptors(InterceptorRegistry registry) {
 	​	        //添加不拦截的路径，SpringBoot已经做好了静态资源映射，所以我们不用管
 	​	        registry.addInterceptor(new LoginHandleInterceptor()).excludePathPatterns(url);
@@ -5905,10 +6824,623 @@ template文件加不是静态资源文件夹，默认是无法直接访问的，
 	​	        return new MyLocaleResolve();
 	​	    }
 	
-	}
+	    /**
+	     * 定义静态资源行为
+	     * @param registry
+	     */
+	    //    @Override
+	    //    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+	    //        /**
+	    //         * 访问  /aa/** 所有请求都去 classpath:/static/ 下面进行匹配
+	    //         */
+	    //        registry.addResourceHandler("/aa/**")
+	    //                .addResourceLocations("classpath:/static/");
+	    //    }
+	}	  
+	```
 	
-	**注意:在spring2.0+的版本中，只要用户自定义了拦截器，则静态资源会被拦截。但是在spring1.0+的版本中，是不会拦截静态资源的**
+	> **注意:在spring2.0+的版本中，只要用户自定义了拦截器，则静态资源会被拦截。但是在spring1.0+的版本中，是不会拦截静态资源的**
 
+#### 拦截器原码分析
+
+1. 根据当前请求，找到**HandlerExecutionChain【**可以处理请求的handler以及handler的所有 拦截器】
+
+2. 先来**顺序执行** 所有拦截器的 preHandle方法
+
+- 1、如果当前拦截器prehandler返回为true。则执行下一个拦截器的preHandle
+- 2、如果当前拦截器返回为false。直接 **倒序**执行所有**已经执行了的拦截器**的  afterCompletion；
+
+3. **如果任何一个拦截器返回false。直接跳出不执行目标方法**
+
+4. **所有拦截器都返回True。执行目标方法**
+
+5. **倒序执行所有拦截器的postHandle方法。**
+
+6. **前面的步骤有任何异常都会直接倒序触发** afterCompletion
+
+7. 页面成功渲染完成以后，也会倒序触发 afterCompletion
+
+```java
+//进入DispatcherServlet分析,前面的处理流程在参数处理请求已作介绍	
+protected void doDispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
+		HttpServletRequest processedRequest = request;
+		HandlerExecutionChain mappedHandler = null;
+		boolean multipartRequestParsed = false;
+
+		WebAsyncManager asyncManager = WebAsyncUtils.getAsyncManager(request);
+
+		try {
+			ModelAndView mv = null;
+			Exception dispatchException = null;
+
+			try {
+				processedRequest = checkMultipart(request);
+				multipartRequestParsed = (processedRequest != request);
+
+				// Determine handler for the current request.
+				mappedHandler = getHandler(processedRequest);
+				if (mappedHandler == null) {
+					noHandlerFound(processedRequest, response);
+					return;
+				}
+
+				// 找到当前适合的处理器,当前访问url:/main.html,找到对应的是com.web.thymeleaf.controller.IndexController#mainPage(HttpSession, Model)
+                //同时也会找到找到所有拦截器List,如下图
+				HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
+
+				// Process last-modified header, if supported by the handler.
+				String method = request.getMethod();
+				boolean isGet = "GET".equals(method);
+				if (isGet || "HEAD".equals(method)) {
+					long lastModified = ha.getLastModified(request, mappedHandler.getHandler());
+					if (new ServletWebRequest(request, response).checkNotModified(lastModified) && isGet) {
+						return;
+					}
+				}
+				//拦截器的前置方法判断,进入研究
+				if (!mappedHandler.applyPreHandle(processedRequest, response)) {
+                    //如任何一个拦截器返回false,则直接跳出执行,退出
+					return;
+				}
+
+				//这里是执行目标方法,在执行目标方法前,会执行拦截器的前置方法,上面
+				mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+
+				if (asyncManager.isConcurrentHandlingStarted()) {
+					return;
+				}
+
+				applyDefaultViewName(processedRequest, mv);
+                //当上面的目标方法执行完,又继续执行拦截器的postHandle,进入研究
+				mappedHandler.applyPostHandle(processedRequest, response, mv);
+			}
+			catch (Exception ex) {
+				dispatchException = ex;
+			}
+			catch (Throwable err) {
+				// As of 4.3, we're processing Errors thrown from handler methods as well,
+				// making them available for @ExceptionHandler methods and other scenarios.
+				dispatchException = new NestedServletException("Handler dispatch failed", err);
+			}
+            //当处理完进入页面渲染,进入这里
+			processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+		}//注意:这里有很多catch方法,也是处理triggerAfterCompletion,说明上面只要有任何异常,都会直接执行拦截器的afterCompletion()
+		catch (Exception ex) {
+			triggerAfterCompletion(processedRequest, response, mappedHandler, ex);
+		}
+		catch (Throwable err) {
+			triggerAfterCompletion(processedRequest, response, mappedHandler,
+					new NestedServletException("Handler processing failed", err));
+		}
+		finally {
+			if (asyncManager.isConcurrentHandlingStarted()) {
+				// Instead of postHandle and afterCompletion
+				if (mappedHandler != null) {
+					mappedHandler.applyAfterConcurrentHandlingStarted(processedRequest, response);
+				}
+			}
+			else {
+				// Clean up any resources used by a multipart request.
+				if (multipartRequestParsed) {
+					cleanupMultipart(processedRequest);
+				}
+			}
+		}
+	}
+
+==============================================
+    //拦截器的前置方法判断
+    boolean applyPreHandle(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    	//获取所有的拦截器
+		HandlerInterceptor[] interceptors = getInterceptors();
+		if (!ObjectUtils.isEmpty(interceptors)) {
+            //顺序方式遍历所有的拦截器
+			for (int i = 0; i < interceptors.length; i++) {
+				HandlerInterceptor interceptor = interceptors[i];
+                //首次进入的是LoginInterceptor.preHandle(),这里是判断所有拦截器的前置处理是否有返回false的,如有继续进入研究
+				if (!interceptor.preHandle(request, response, this.handler)) {
+					triggerAfterCompletion(request, response, null);
+					return false;
+				}
+				this.interceptorIndex = i;
+			}
+		}
+		return true;
+	}
+=======================================
+    //如前置处理器有有返回false的
+    void triggerAfterCompletion(HttpServletRequest request, HttpServletResponse response, @Nullable Exception ex)
+    throws Exception {
+	//获取已执行的所有拦截器
+    HandlerInterceptor[] interceptors = getInterceptors();
+    if (!ObjectUtils.isEmpty(interceptors)) {
+        //以倒序的方式遍历所有拦截器
+        for (int i = this.interceptorIndex; i >= 0; i--) {
+            HandlerInterceptor interceptor = interceptors[i];
+            try {
+                //执行拦截器的后置处理
+                interceptor.afterCompletion(request, response, this.handler, ex);
+            }
+            catch (Throwable ex2) {
+                logger.error("HandlerInterceptor.afterCompletion threw exception", ex2);
+            }
+        }
+    }
+}
+=================================
+    void applyPostHandle(HttpServletRequest request, HttpServletResponse response, @Nullable ModelAndView mv)
+			throws Exception {
+		
+		HandlerInterceptor[] interceptors = getInterceptors();
+		if (!ObjectUtils.isEmpty(interceptors)) {
+            //倒序执行拦截器的postHandle
+			for (int i = interceptors.length - 1; i >= 0; i--) {
+				HandlerInterceptor interceptor = interceptors[i];
+				interceptor.postHandle(request, response, this.handler, mv);
+			}
+		}
+	}
+================================
+    //进入页面渲染
+    	private void processDispatchResult(HttpServletRequest request, HttpServletResponse response,
+			@Nullable HandlerExecutionChain mappedHandler, @Nullable ModelAndView mv,
+			@Nullable Exception exception) throws Exception {
+
+		boolean errorView = false;
+
+		if (exception != null) {
+			if (exception instanceof ModelAndViewDefiningException) {
+				logger.debug("ModelAndViewDefiningException encountered", exception);
+				mv = ((ModelAndViewDefiningException) exception).getModelAndView();
+			}
+			else {
+				Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
+				mv = processHandlerException(request, response, handler, exception);
+				errorView = (mv != null);
+			}
+		}
+
+		// Did the handler return a view to render?
+		if (mv != null && !mv.wasCleared()) {
+			render(mv, request, response);
+			if (errorView) {
+				WebUtils.clearErrorRequestAttributes(request);
+			}
+		}
+		else {
+			if (logger.isTraceEnabled()) {
+				logger.trace("No view rendering, null ModelAndView returned.");
+			}
+		}
+
+		if (WebAsyncUtils.getAsyncManager(request).isConcurrentHandlingStarted()) {
+			// Concurrent handling started during a forward
+			return;
+		}
+		//注意:这里,当页面渲染成功以后,还会以倒序的方式调用拦截器的afterCompletion()方法
+		if (mappedHandler != null) {
+			// Exception (if any) is already handled..
+			mappedHandler.triggerAfterCompletion(request, response, null);
+		}
+	}
+```
+
+根据请求找到Handler时,也会同时找到所有的处理器
+
+![](http://120.77.237.175:9080/photos/springboot/115.jpg)
+
+> **注意:以顺序方式执行拦截器的preHandle方法时,有遇到返回false时,则只会执行已执行到的拦截器的afterCompletion,没执行到的是不会去执行的**
+
+![](http://120.77.237.175:9080/photos/springboot/116.jpg)
+
+### 文件上传
+
+#### 实现
+
+```java
+  @PostMapping("/upload")
+    public String upload(@RequestParam("email") String email,
+                         @RequestParam("username") String username,
+                         @RequestPart("headerImg") MultipartFile headerImg,
+                         @RequestPart("photos") MultipartFile[] photos) throws IOException {
+
+        log.info("上传的信息：email={}，username={}，headerImg={}，photos={}",
+                email,username,headerImg.getSize(),photos.length);
+
+        if(!headerImg.isEmpty()){
+            //保存到文件服务器，OSS服务器
+            String originalFilename = headerImg.getOriginalFilename();
+            //把文件存储到指定地址
+            headerImg.transferTo(new File("D:\\tmp\\"+originalFilename));
+        }
+
+        if(photos.length > 0){
+            for (MultipartFile photo : photos) {
+                if(!photo.isEmpty()){
+                    String originalFilename = photo.getOriginalFilename();
+                    photo.transferTo(new File("D:\\tmp\\"+originalFilename));
+                }
+            }
+        }
+
+
+        return "main";
+    }
+```
+
+
+
+#### 原理
+
+**文件上传自动配置类-MultipartAutoConfiguration-****MultipartProperties**
+
+- 自动配置好了 **StandardServletMultipartResolver  【文件上传解析器】**
+- **原理步骤**
+
+- - **1、请求进来使用文件上传解析器判断（**isMultipart**）并封装（**resolveMultipart，**返回**MultipartHttpServletRequest**）文件上传请求**
+  - **2、参数解析器来解析请求中的文件内容封装成MultipartFile**
+  - **3、将request中文件信息封装为一个Map；MultiValueMap<String, MultipartFile>**
+  - **4 最终,其处理就是文件上传时,已提前解析封装到Map里,当参数处理时,解析到对应的文件上传参数就是到Map里寻找**
+
+**FileCopyUtils**。实现文件流的拷贝
+
+```java
+	//继续进入DispatchServlet.doDispatch()
+	protected void doDispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
+		HttpServletRequest processedRequest = request;
+		HandlerExecutionChain mappedHandler = null;
+        //首先会把文件上传请求解析设为false
+		boolean multipartRequestParsed = false;
+
+		WebAsyncManager asyncManager = WebAsyncUtils.getAsyncManager(request);
+
+		try {
+			ModelAndView mv = null;
+			Exception dispatchException = null;
+
+			try {
+                //检查是否文件请求,进入研究,把request重新包装给processedRequest
+				processedRequest = checkMultipart(request);
+                //判断processedRequest是否与当前request请求一样,不一样赋值为true
+				multipartRequestParsed = (processedRequest != request);
+
+				//寻找哪个处理器可以处理该请求.最终找到com.web.thymeleaf.controller.FormTestController#upload(String, String, MultipartFile, MultipartFile[])处理其请求
+				mappedHandler = getHandler(processedRequest);
+				if (mappedHandler == null) {
+					noHandlerFound(processedRequest, response);
+					return;
+				}
+
+				// Determine handler adapter for the current request.
+				HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
+
+				// Process last-modified header, if supported by the handler.
+				String method = request.getMethod();
+				boolean isGet = "GET".equals(method);
+				if (isGet || "HEAD".equals(method)) {
+					long lastModified = ha.getLastModified(request, mappedHandler.getHandler());
+					if (new ServletWebRequest(request, response).checkNotModified(lastModified) && isGet) {
+						return;
+					}
+				}
+
+				if (!mappedHandler.applyPreHandle(processedRequest, response)) {
+					return;
+				}
+
+				// 处理请求,进入,处理参数过程和参数处理原理一样,过程直接跳过,不作解释
+                //最终会找到RequestPartMethodArgumentResolver,其支持解析以 @RequestPart为开头,符合文件上传
+                //最终进入到InvocableHandlerMethod.getMethodArgumentValues()看如何处理其参数
+				mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+
+				if (asyncManager.isConcurrentHandlingStarted()) {
+					return;
+				}
+
+				applyDefaultViewName(processedRequest, mv);
+				mappedHandler.applyPostHandle(processedRequest, response, mv);
+			}
+			catch (Exception ex) {
+				dispatchException = ex;
+			}
+			catch (Throwable err) {
+				// As of 4.3, we're processing Errors thrown from handler methods as well,
+				// making them available for @ExceptionHandler methods and other scenarios.
+				dispatchException = new NestedServletException("Handler dispatch failed", err);
+			}
+			processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+		}
+		catch (Exception ex) {
+			triggerAfterCompletion(processedRequest, response, mappedHandler, ex);
+		}
+		catch (Throwable err) {
+			triggerAfterCompletion(processedRequest, response, mappedHandler,
+					new NestedServletException("Handler processing failed", err));
+		}
+		finally {
+			if (asyncManager.isConcurrentHandlingStarted()) {
+				// Instead of postHandle and afterCompletion
+				if (mappedHandler != null) {
+					mappedHandler.applyAfterConcurrentHandlingStarted(processedRequest, response);
+				}
+			}
+			else {
+				// Clean up any resources used by a multipart request.
+				if (multipartRequestParsed) {
+					cleanupMultipart(processedRequest);
+				}
+			}
+		}
+	}
+
+======================================
+    	protected HttpServletRequest checkMultipart(HttpServletRequest request) throws MultipartException {
+    //检查是否文件上传请求,同时使用multipartResolver文件上传解析器去判断该请求,进入研究是如何判断
+		if (this.multipartResolver != null && this.multipartResolver.isMultipart(request)) {
+			if (WebUtils.getNativeRequest(request, MultipartHttpServletRequest.class) != null) {
+				if (request.getDispatcherType().equals(DispatcherType.REQUEST)) {
+					logger.trace("Request already resolved to MultipartHttpServletRequest, e.g. by MultipartFilter");
+				}
+			}
+			else if (hasMultipartException(request)) {
+				logger.debug("Multipart resolution previously failed for current request - " +
+						"skipping re-resolution for undisturbed error rendering");
+			}
+			else {
+				try {
+                    //判断成功则使用文件上传解析器解析其请求进行返回,进入这里,看如何解析
+					return this.multipartResolver.resolveMultipart(request);
+				}
+				catch (MultipartException ex) {
+					if (request.getAttribute(WebUtils.ERROR_EXCEPTION_ATTRIBUTE) != null) {
+						logger.debug("Multipart resolution failed for error dispatch", ex);
+						// Keep processing error dispatch with regular request handle below
+					}
+					else {
+						throw ex;
+					}
+				}
+			}
+		}
+		// If not returned before: return original request.
+		return request;
+	}
+
+====================================
+    //这里判断其上传的contentType其是否以multipart/开头,因此,表格上传文件为什么要设置
+    //<form role="form" th:action="@{/upload}" method="post" enctype="multipart/form-data">
+    	@Override
+	public boolean isMultipart(HttpServletRequest request) {
+		return StringUtils.startsWithIgnoreCase(request.getContentType(), "multipart/");
+	}
+
+==================================
+    //把请求封装成StandardMultipartHttpServletRequest,最终返回MultipartHttpServletRequest,统一返回处理对象
+    @Override
+	public MultipartHttpServletRequest resolveMultipart(HttpServletRequest request) throws MultipartException {
+		return new StandardMultipartHttpServletRequest(request, this.resolveLazily);
+	}
+
+==================================	
+    //RequestPartMethodArgumentResolver支持解析参数
+    @Override
+	public boolean supportsParameter(MethodParameter parameter) {
+		if (parameter.hasParameterAnnotation(RequestPart.class)) {
+			return true;
+		}
+		else {
+			if (parameter.hasParameterAnnotation(RequestParam.class)) {
+				return false;
+			}
+			return MultipartResolutionDelegate.isMultipartArgument(parameter.nestedIfOptional());
+		}
+	}
+
+===============================================	
+    protected Object[] getMethodArgumentValues(NativeWebRequest request, @Nullable ModelAndViewContainer mavContainer,
+			Object... providedArgs) throws Exception {
+
+		MethodParameter[] parameters = getMethodParameters();
+		if (ObjectUtils.isEmpty(parameters)) {
+			return EMPTY_ARGS;
+		}
+
+		Object[] args = new Object[parameters.length];
+		for (int i = 0; i < parameters.length; i++) {
+			MethodParameter parameter = parameters[i];
+			parameter.initParameterNameDiscovery(this.parameterNameDiscoverer);
+			args[i] = findProvidedArgument(parameter, providedArgs);
+			if (args[i] != null) {
+				continue;
+			}
+            //遍历寻找支持解析当前参数的解析器,可以进入看下
+			if (!this.resolvers.supportsParameter(parameter)) {
+				throw new IllegalStateException(formatArgumentError(parameter, "No suitable resolver"));
+			}
+			try {
+                //找到适合的解析器后,看如何处理其参数的,进入
+				args[i] = this.resolvers.resolveArgument(parameter, mavContainer, request, this.dataBinderFactory);
+			}
+			catch (Exception ex) {
+				// Leave stack trace for later, exception may actually be resolved and handled...
+				if (logger.isDebugEnabled()) {
+					String exMsg = ex.getMessage();
+					if (exMsg != null && !exMsg.contains(parameter.getExecutable().toGenericString())) {
+						logger.debug(formatArgumentError(parameter, exMsg));
+					}
+				}
+				throw ex;
+			}
+		}
+		return args;
+	}
+
+=============================	
+    @Override
+	@Nullable
+	public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
+			NativeWebRequest webRequest, @Nullable WebDataBinderFactory binderFactory) throws Exception {
+
+		HandlerMethodArgumentResolver resolver = getArgumentResolver(parameter);
+		if (resolver == null) {
+			throw new IllegalArgumentException("Unsupported parameter type [" +
+					parameter.getParameterType().getName() + "]. supportsParameter should be called first.");
+		}
+    	//继续进入看如何处理文件上传
+		return resolver.resolveArgument(parameter, mavContainer, webRequest, binderFactory);
+	}
+============================
+    @Override
+	@Nullable
+	public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
+			NativeWebRequest request, @Nullable WebDataBinderFactory binderFactory) throws Exception {
+
+		HttpServletRequest servletRequest = request.getNativeRequest(HttpServletRequest.class);
+		Assert.state(servletRequest != null, "No HttpServletRequest");
+
+		RequestPart requestPart = parameter.getParameterAnnotation(RequestPart.class);
+		boolean isRequired = ((requestPart == null || requestPart.required()) && !parameter.isOptional());
+		//获取文件参数名
+		String name = getPartName(parameter, requestPart);
+		parameter = parameter.nestedIfOptional();
+		Object arg = null;
+		//使用文件上传代理解析其文件上传参数,进入看如何解析
+		Object mpArg = MultipartResolutionDelegate.resolveMultipartArgument(name, parameter, servletRequest);
+		if (mpArg != MultipartResolutionDelegate.UNRESOLVABLE) {
+			arg = mpArg;
+		}
+		else {
+			try {
+				HttpInputMessage inputMessage = new RequestPartServletServerHttpRequest(servletRequest, name);
+				arg = readWithMessageConverters(inputMessage, parameter, parameter.getNestedGenericParameterType());
+				if (binderFactory != null) {
+					WebDataBinder binder = binderFactory.createBinder(request, arg, name);
+					if (arg != null) {
+						validateIfApplicable(binder, parameter);
+						if (binder.getBindingResult().hasErrors() && isBindExceptionRequired(binder, parameter)) {
+							throw new MethodArgumentNotValidException(parameter, binder.getBindingResult());
+						}
+					}
+					if (mavContainer != null) {
+						mavContainer.addAttribute(BindingResult.MODEL_KEY_PREFIX + name, binder.getBindingResult());
+					}
+				}
+			}
+			catch (MissingServletRequestPartException | MultipartException ex) {
+				if (isRequired) {
+					throw ex;
+				}
+			}
+		}
+
+		if (arg == null && isRequired) {
+			if (!MultipartResolutionDelegate.isMultipartRequest(servletRequest)) {
+				throw new MultipartException("Current request is not a multipart request");
+			}
+			else {
+				throw new MissingServletRequestPartException(name);
+			}
+		}
+		return adaptArgumentIfNecessary(arg, parameter);
+	}
+
+=================================================
+    	@Nullable
+	public static Object resolveMultipartArgument(String name, MethodParameter parameter, HttpServletRequest request)
+			throws Exception {
+		//使用工具类解析其文件上传请求
+		MultipartHttpServletRequest multipartRequest =
+				WebUtils.getNativeRequest(request, MultipartHttpServletRequest.class);
+    	//判断multipartRequest不为Null,或者请求contentType是否以multipart/开头,为true
+		boolean isMultipart = (multipartRequest != null || isMultipartContent(request));
+		
+		if (MultipartFile.class == parameter.getNestedParameterType()) {
+            //判断multipartRequest不为Null并且isMultipart为true
+			if (multipartRequest == null && isMultipart) {
+				multipartRequest = new StandardMultipartHttpServletRequest(request);
+			}
+            	//根据上传名获取文件,name为headerImg,返回,进去看如何获取
+			return (multipartRequest != null ? multipartRequest.getFile(name) : null);
+		}
+		else if (isMultipartFileCollection(parameter)) {
+			if (multipartRequest == null && isMultipart) {
+				multipartRequest = new StandardMultipartHttpServletRequest(request);
+			}
+			return (multipartRequest != null ? multipartRequest.getFiles(name) : null);
+		}
+		else if (isMultipartFileArray(parameter)) {
+			if (multipartRequest == null && isMultipart) {
+				multipartRequest = new StandardMultipartHttpServletRequest(request);
+			}
+			if (multipartRequest != null) {
+				List<MultipartFile> multipartFiles = multipartRequest.getFiles(name);
+				return multipartFiles.toArray(new MultipartFile[0]);
+			}
+			else {
+				return null;
+			}
+		}
+		else if (Part.class == parameter.getNestedParameterType()) {
+			return (isMultipart ? request.getPart(name): null);
+		}
+		else if (isPartCollection(parameter)) {
+			return (isMultipart ? resolvePartList(request, name) : null);
+		}
+		else if (isPartArray(parameter)) {
+			return (isMultipart ? resolvePartList(request, name).toArray(new Part[0]) : null);
+		}
+		else {
+			return UNRESOLVABLE;
+		}
+	}
+=============================================
+    //根据当前参数名获取指定的文件
+    @Override
+	public MultipartFile getFile(String name) {
+    //继续进入
+		return getMultipartFiles().getFirst(name);
+	}
+===============================================
+    //把所有的文件上传都已经获取到,封装成MultiValueMap<String, MultipartFile>,如下图
+    protected MultiValueMap<String, MultipartFile> getMultipartFiles() {
+		if (this.multipartFiles == null) {
+			initializeMultipart();
+		}
+		return this.multipartFiles;
+	}
+ ========================================
+     //在Map中获取指定的上传对象
+    @Override
+	@Nullable
+	public V getFirst(K key) {
+		List<V> values = this.targetMap.get(key);
+		return (values != null && !values.isEmpty() ? values.get(0) : null);
+	}
+```
+
+> 把上传的文件初始化封装成 MultiValueMap<String, MultipartFile>
+
+![](http://120.77.237.175:9080/photos/springboot/117.jpg)
 
 ### CRUD-员工列表 ###
 
@@ -6324,6 +7856,7 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 	```
 	
 	
+	```
 
 
 #### 删除员工 ####
@@ -6345,7 +7878,9 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 
 ![](http://120.77.237.175:9080/photos/springboot/43.jpg)
 
-### 错误处理机制 ###
+### 异常处理 ###
+
+#### 错误处理
 
 当访问一个不存在的页面，或者程序抛出异常时
 
@@ -6359,8 +7894,23 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 
 	![](http://120.77.237.175:9080/photos/springboot/45.png)
 
+##### 默认规则
 
-查看`org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration`源码
+- 默认情况下，Spring Boot提供`/error`处理所有错误的映射
+
+- 对于机器客户端，它将生成JSON响应，其中包含错误，HTTP状态和异常消息的详细信息。对于浏览器客户端，响应一个“ whitelabel”错误视图，以HTML格式呈现相同的数据
+
+- **要对其进行自定义，添加`View`解析为`error`**
+
+- 要完全替换默认行为，可以实现 `ErrorController `并注册该类型的Bean定义，或添加`ErrorAttributes类型的组件`以使用现有机制但替换其内容。
+
+- error/下的4xx，5xx页面会被自动解析
+
+  ![](http://120.77.237.175:9080/photos/springboot/118.jpg)
+
+#### 异常处理自动配置原理
+
+查看`org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration`**自动配置异常处理规则**
 
 这里是springboot错误处理的自动配置信息,给容器中添加了以下组件
 
@@ -6369,41 +7919,123 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 3. ErrorPageCustomizer
 4. DefaultErrorViewResolver
 
-#### ErrorPageCustomizer ####
+##### DefaultErrorAttributes
 
-	@Bean
-	public ErrorPageCustomizer errorPageCustomizer(DispatcherServletPath dispatcherServletPath) {
-		return new ErrorPageCustomizer(this.serverProperties, dispatcherServletPath);
+定义错误页面中可以包含哪些数据
+
+```java
+@Bean
+@ConditionalOnMissingBean(value = ErrorAttributes.class, search = SearchStrategy.CURRENT)
+public DefaultErrorAttributes errorAttributes() {
+    return new DefaultErrorAttributes();
+}
+============================================
+    
+public class DefaultErrorAttributes implements ErrorAttributes, HandlerExceptionResolver, Ordered{
+    ...
+     @Override
+	public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response, Object handler,
+			Exception ex) {
+        //保存错误信息
+		storeErrorAttributes(request, ex);
+		return null;
+	} 
+    
+    //页面包含的错误信息
+    @Override
+	public Map<String, Object> getErrorAttributes(WebRequest webRequest, ErrorAttributeOptions options) {
+		Map<String, Object> errorAttributes = getErrorAttributes(webRequest, options.isIncluded(Include.STACK_TRACE));
+		if (Boolean.TRUE.equals(this.includeException)) {
+			options = options.including(Include.EXCEPTION);
+		}
+		if (!options.isIncluded(Include.EXCEPTION)) {
+			errorAttributes.remove("exception");
+		}
+		if (!options.isIncluded(Include.STACK_TRACE)) {
+			errorAttributes.remove("trace");
+		}
+		if (!options.isIncluded(Include.MESSAGE) && errorAttributes.get("message") != null) {
+			errorAttributes.put("message", "");
+		}
+		if (!options.isIncluded(Include.BINDING_ERRORS)) {
+			errorAttributes.remove("errors");
+		}
+		return errorAttributes;
 	}
+    
+    //可获取到的错误信息
+    @Override
+	@Deprecated
+	public Map<String, Object> getErrorAttributes(WebRequest webRequest, boolean includeStackTrace) {
+		Map<String, Object> errorAttributes = new LinkedHashMap<>();
+		errorAttributes.put("timestamp", new Date());
+		addStatus(errorAttributes, webRequest);	//可以添加的错误属性....
+		addErrorDetails(errorAttributes, webRequest, includeStackTrace);
+		addPath(errorAttributes, webRequest);
+		return errorAttributes;
+	}
+    
+    private void addStatus(Map<String, Object> errorAttributes, RequestAttributes requestAttributes) {
+		Integer status = getAttribute(requestAttributes, RequestDispatcher.ERROR_STATUS_CODE);
+		if (status == null) {
+			errorAttributes.put("status", 999);
+			errorAttributes.put("error", "None");
+			return;
+		}
+		errorAttributes.put("status", status);
+		try {
+			errorAttributes.put("error", HttpStatus.valueOf(status).getReasonPhrase());
+		}
+		catch (Exception ex) {
+			// Unable to obtain a reason
+			errorAttributes.put("error", "Http Status " + status);
+		}
+	}
+    ...
+}
+```
+
+
+
+##### ErrorPageCustomizer #####
+
+```java
+@Bean
+public ErrorPageCustomizer errorPageCustomizer(DispatcherServletPath dispatcherServletPath) {
+	return new ErrorPageCustomizer(this.serverProperties, dispatcherServletPath);
+}
+```
 
 ----
 
-	private static class ErrorPageCustomizer implements ErrorPageRegistrar, Ordered {
-	
-		private final ServerProperties properties;
-	
-		private final DispatcherServletPath dispatcherServletPath;
-	
-		protected ErrorPageCustomizer(ServerProperties properties, DispatcherServletPath dispatcherServletPath) {
-			this.properties = properties;
-			this.dispatcherServletPath = dispatcherServletPath;
-		}
-	
-		//注册错误页面
-		@Override
-		public void registerErrorPages(ErrorPageRegistry errorPageRegistry) {
-			//getPath()获取到的是"/error"，见下图
-			ErrorPage errorPage = new ErrorPage(
-					this.dispatcherServletPath.getRelativePath(this.properties.getError().getPath()));
-			errorPageRegistry.addErrorPages(errorPage);
-		}
-	
-		@Override
-		public int getOrder() {
-			return 0;
-		}
-	
+```java
+private static class ErrorPageCustomizer implements ErrorPageRegistrar, Ordered {
+
+	private final ServerProperties properties;
+
+	private final DispatcherServletPath dispatcherServletPath;
+
+	protected ErrorPageCustomizer(ServerProperties properties, DispatcherServletPath dispatcherServletPath) {
+		this.properties = properties;
+		this.dispatcherServletPath = dispatcherServletPath;
 	}
+
+	//注册错误页面
+	@Override
+	public void registerErrorPages(ErrorPageRegistry errorPageRegistry) {
+		//getPath()获取到的是"/error"，见下图
+		ErrorPage errorPage = new ErrorPage(
+				this.dispatcherServletPath.getRelativePath(this.properties.getError().getPath()));
+		errorPageRegistry.addErrorPages(errorPage);
+	}
+
+	@Override
+	public int getOrder() {
+		return 0;
+	}
+
+}
+```
 
 ![](http://120.77.237.175:9080/photos/springboot/46.jpg)
 
@@ -6411,151 +8043,523 @@ URI：  /资源名称/资源标识       HTTP请求方式区分对资源CRUD操�
 
 然后这个error请求就会被BasicErrorController处理；
 
-#### BasicErrorController ####
+##### BasicErrorController #####
 
-	@Bean
-	@ConditionalOnMissingBean(value = ErrorController.class, search = SearchStrategy.CURRENT)
-	public BasicErrorController basicErrorController(ErrorAttributes errorAttributes,
-			ObjectProvider<ErrorViewResolver> errorViewResolvers) {
-		return new BasicErrorController(errorAttributes, this.serverProperties.getError(),
-				errorViewResolvers.orderedStream().collect(Collectors.toList()));
-	}
+**（json+白页 适配响应）**
+
+```java
+@Bean
+@ConditionalOnMissingBean(value = ErrorController.class, search = SearchStrategy.CURRENT)
+public BasicErrorController basicErrorController(ErrorAttributes errorAttributes,
+		ObjectProvider<ErrorViewResolver> errorViewResolvers) {
+	return new BasicErrorController(errorAttributes, this.serverProperties.getError(),
+			errorViewResolvers.orderedStream().collect(Collectors.toList()));
+}
+```
 
 ----
 
-	/**
-	  * 使用配置文件中server.error.path配置
-	  * 如果server.error.path没有配置使用error.path
-	  * 如果error.path也没有配置就使用/error
-	  */
-	@RequestMapping("${server.error.path:${error.path:/error}}")
-	public class BasicErrorController extends AbstractErrorController {
-		......
-	
-		@RequestMapping(produces = MediaType.TEXT_HTML_VALUE)//产生html类型的数据；浏览器发送的请求来到这个方法处理
-		public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
-			HttpStatus status = getStatus(request);
-			Map<String, Object> model = Collections
-					.unmodifiableMap(getErrorAttributes(request, isIncludeStackTrace(request, MediaType.TEXT_HTML)));
-			response.setStatus(status.value());
-			//去哪个页面作为错误页面；包含页面地址和页面内容
-			ModelAndView modelAndView = resolveErrorView(request, response, status, model);
-			return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
-		}
-	
-		//产生json数据，其他客户端来到这个方法处理
-		@RequestMapping
-		public ResponseEntity<Map<String, Object>> error(HttpServletRequest request) {
-			HttpStatus status = getStatus(request);
-			//ResponseEntity的优先级高于@ResponseBody
-			//在不是ResponseEntity的情况下去检查有没有@ResponseBody注解
-			//如果响应类型是ResponseEntity可以不写@ResponseBody注解,写了也没有关系
-			if (status == HttpStatus.NO_CONTENT) {
-				return new ResponseEntity<>(status);
-			}
-			Map<String, Object> body = getErrorAttributes(request, isIncludeStackTrace(request, MediaType.ALL));
-			return new ResponseEntity<>(body, status);
-		}
+```java
+/**
+  * 处理/error路径的请求
+  * 使用配置文件中server.error.path配置
+  * 如果server.error.path没有配置使用error.path
+  * 如果error.path也没有配置就使用/error
+  */
+@RequestMapping("${server.error.path:${error.path:/error}}")
+public class BasicErrorController extends AbstractErrorController {
+	......
+
+	@RequestMapping(produces = MediaType.TEXT_HTML_VALUE)//产生html类型的数据；浏览器发送的请求来到这个方法处理
+	public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
+		HttpStatus status = getStatus(request);
+		Map<String, Object> model = Collections
+				.unmodifiableMap(getErrorAttributes(request, isIncludeStackTrace(request, MediaType.TEXT_HTML)));
+		response.setStatus(status.value());
+		//去哪个页面作为错误页面；包含页面地址和页面内容
+		ModelAndView modelAndView = resolveErrorView(request, response, status, model);
+        //页面响应 new ModelAndView("error", model)；
+		return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
 	}
+
+	//产生json数据，其他客户端来到这个方法处理
+	@RequestMapping
+	public ResponseEntity<Map<String, Object>> error(HttpServletRequest request) {
+		HttpStatus status = getStatus(request);
+		//ResponseEntity的优先级高于@ResponseBody
+		//在不是ResponseEntity的情况下去检查有没有@ResponseBody注解
+		//如果响应类型是ResponseEntity可以不写@ResponseBody注解,写了也没有关系
+		if (status == HttpStatus.NO_CONTENT) {
+			return new ResponseEntity<>(status);
+		}
+		Map<String, Object> body = getErrorAttributes(request, isIncludeStackTrace(request, MediaType.ALL));
+		return new ResponseEntity<>(body, status);
+	}
+}
+```
 
 处理浏览器请求的方法 中，modelAndView存储到哪个页面的页面地址和页面内容数据
 
 看一下调用的resolveErrorView方法
 
-	protected ModelAndView resolveErrorView(HttpServletRequest request, HttpServletResponse response, HttpStatus status,
-			Map<String, Object> model) {
-		for (ErrorViewResolver resolver : this.errorViewResolvers) {
-			 //从所有的ErrorViewResolver得到ModelAndView
-			ModelAndView modelAndView = resolver.resolveErrorView(request, status, model);
-			if (modelAndView != null) {
-				return modelAndView;
-			}
+```java
+protected ModelAndView resolveErrorView(HttpServletRequest request, HttpServletResponse response, HttpStatus status,
+		Map<String, Object> model) {
+	for (ErrorViewResolver resolver : this.errorViewResolvers) {
+		 //从所有的ErrorViewResolver得到ModelAndView
+		ModelAndView modelAndView = resolver.resolveErrorView(request, status, model);
+		if (modelAndView != null) {
+			return modelAndView;
 		}
-		return null;
 	}
+	return null;
+}
+```
 
 ErrorViewResolver从哪里来的呢？
 
 已经在容器中注册了一个DefaultErrorViewResolver
 
-#### DefaultErrorViewResolver ####
+##### DefaultErrorViewResolver(过时) #####
+
+如果发生错误，会以HTTP的状态码 作为视图页地址（viewName），找到真正的页面error/404、5xx.html
 
 
-	@Configuration(proxyBeanMethods = false)
-	static class DefaultErrorViewResolverConfiguration {
-	
-		private final ApplicationContext applicationContext;
-	
-		private final ResourceProperties resourceProperties;
-	
-		DefaultErrorViewResolverConfiguration(ApplicationContext applicationContext,
-				ResourceProperties resourceProperties) {
-			this.applicationContext = applicationContext;
-			this.resourceProperties = resourceProperties;
-		}
-	
-		//注册默认错误视图解析器
-		@Bean
-		@ConditionalOnBean(DispatcherServlet.class)
-		@ConditionalOnMissingBean(ErrorViewResolver.class)
-		DefaultErrorViewResolver conventionErrorViewResolver() {
-			return new DefaultErrorViewResolver(this.applicationContext, this.resourceProperties);
-		}
-	
+```java
+@Configuration(proxyBeanMethods = false)
+static class DefaultErrorViewResolverConfiguration {
+
+	private final ApplicationContext applicationContext;
+
+	private final ResourceProperties resourceProperties;
+
+	DefaultErrorViewResolverConfiguration(ApplicationContext applicationContext,
+			ResourceProperties resourceProperties) {
+		this.applicationContext = applicationContext;
+		this.resourceProperties = resourceProperties;
 	}
+
+	//注册默认错误视图解析器
+    //id:conventionErrorViewResolver
+	@Bean
+	@ConditionalOnBean(DispatcherServlet.class)
+	@ConditionalOnMissingBean(ErrorViewResolver.class)
+	DefaultErrorViewResolver conventionErrorViewResolver() {
+		return new DefaultErrorViewResolver(this.applicationContext, this.resourceProperties);
+	}
+
+}
+```
 
 然后调用`ErrorViewResolver`的`resolveErrorView()`方法
 
-	public class DefaultErrorViewResolver implements ErrorViewResolver, Ordered {
-		...
-	
-		@Override
-		public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
-			//把状态码和model传过去获取视图
-			ModelAndView modelAndView = resolve(String.valueOf(status.value()), model);
-			 //上面没有获取到视图就使用把状态吗替换再再找，以4开头的替换为4xx，5开头替换为5xx，见下文（如果定制错误响应）
-			if (modelAndView == null && SERIES_VIEWS.containsKey(status.series())) {
-				modelAndView = resolve(SERIES_VIEWS.get(status.series()), model);
-			}
-			return modelAndView;
+```java
+public class DefaultErrorViewResolver implements ErrorViewResolver, Ordered {
+	...
+
+	@Override
+	public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
+		//把状态码和model传过去获取视图
+		ModelAndView modelAndView = resolve(String.valueOf(status.value()), model);
+		 //上面没有获取到视图就使用把状态吗替换再再找，以4开头的替换为4xx，5开头替换为5xx，见下文（如果定制错误响应）
+		if (modelAndView == null && SERIES_VIEWS.containsKey(status.series())) {
+			modelAndView = resolve(SERIES_VIEWS.get(status.series()), model);
 		}
-	
-		private ModelAndView resolve(String viewName, Map<String, Object> model) {
-			 //默认SpringBoot可以去找到一个页面？  error/404
-			String errorViewName = "error/" + viewName;
-			 //模板引擎可以解析这个页面地址就用模板引擎解析
-			TemplateAvailabilityProvider provider = this.templateAvailabilityProviders.getProvider(errorViewName,
-					this.applicationContext);
-			if (provider != null) {
-				//模板引擎可用的情况下返回到errorViewName指定的视图地址
-				return new ModelAndView(errorViewName, model);
-			}
-			//模板引擎不可用，就在静态资源文件夹下找errorViewName对应的页面   error/404.html
-			return resolveResource(errorViewName, model);
-		}
-		...
+		return modelAndView;
 	}
+
+	private ModelAndView resolve(String viewName, Map<String, Object> model) {
+		 //默认SpringBoot可以去找到一个页面？  error/404
+		String errorViewName = "error/" + viewName;
+		 //模板引擎可以解析这个页面地址就用模板引擎解析
+		TemplateAvailabilityProvider provider = this.templateAvailabilityProviders.getProvider(errorViewName,
+				this.applicationContext);
+		if (provider != null) {
+			//模板引擎可用的情况下返回到errorViewName指定的视图地址
+			return new ModelAndView(errorViewName, model);
+		}
+		//模板引擎不可用，就在静态资源文件夹下找errorViewName对应的页面   error/404.html
+		return resolveResource(errorViewName, model);
+	}
+	...
+}
+```
 
 如果模板引擎不可用，就调用resolveResource方法获取视图
 
-	private ModelAndView resolveResource(String viewName, Map<String, Object> model) {
-		//获取的是静态资源文件夹
-		for (String location : this.resourceProperties.getStaticLocations()) {
-			try {
-				Resource resource = this.applicationContext.getResource(location);
-				//例：static/error.html
-				resource = resource.createRelative(viewName + ".html");
-				//存在则返回视图
-				if (resource.exists()) {
-					return new ModelAndView(new HtmlResourceView(resource), model);
-				}
-			}
-			catch (Exception ex) {
+```java
+private ModelAndView resolveResource(String viewName, Map<String, Object> model) {
+	//获取的是静态资源文件夹
+	for (String location : this.resourceProperties.getStaticLocations()) {
+		try {
+			Resource resource = this.applicationContext.getResource(location);
+			//例：static/error.html
+			resource = resource.createRelative(viewName + ".html");
+			//存在则返回视图
+			if (resource.exists()) {
+				return new ModelAndView(new HtmlResourceView(resource), model);
 			}
 		}
-		return null;
+		catch (Exception ex) {
+		}
 	}
+	return null;
+}
+```
 
+##### View
+
+**容器中有组件 View**->**id是error**；（响应默认错误页）
+
+```java
+//最终视图渲染成什么样,就是由View去决定,可以进入StaticView进去
+private final StaticView defaultErrorView = new StaticView();
+
+@Bean(name = "error")
+@ConditionalOnMissingBean(name = "error")
+public View defaultErrorView() {
+	return this.defaultErrorView;
+}
+=======================================
+ //可以看到StaticView类里render渲染的默认错误页面结果都是在这里定义的
+    	@Override
+		public void render(Map<String, ?> model, HttpServletRequest request, HttpServletResponse response)
+				throws Exception {
+			if (response.isCommitted()) {
+				String message = getMessage(model);
+				logger.error(message);
+				return;
+			}
+			response.setContentType(TEXT_HTML_UTF8.toString());
+			StringBuilder builder = new StringBuilder();
+			Object timestamp = model.get("timestamp");
+			Object message = model.get("message");
+			Object trace = model.get("trace");
+			if (response.getContentType() == null) {
+				response.setContentType(getContentType());
+			}
+			builder.append("<html><body><h1>Whitelabel Error Page</h1>").append(
+					"<p>This application has no explicit mapping for /error, so you are seeing this as a fallback.</p>")
+					.append("<div id='created'>").append(timestamp).append("</div>")
+					.append("<div>There was an unexpected error (type=").append(htmlEscape(model.get("error")))
+					.append(", status=").append(htmlEscape(model.get("status"))).append(").</div>");
+			if (message != null) {
+				builder.append("<div>").append(htmlEscape(message)).append("</div>");
+			}
+			if (trace != null) {
+				builder.append("<div style='white-space:pre-wrap;'>").append(htmlEscape(trace)).append("</div>");
+			}
+			builder.append("</body></html>");
+			response.getWriter().append(builder.toString());
+		}
+```
+
+##### BeanNameViewResolver
+
+视图解析器**按照返回的视图名作为组件的id去容器中找View对象。**
+
+```
+@Bean
+@ConditionalOnMissingBean
+public BeanNameViewResolver beanNameViewResolver() {
+    BeanNameViewResolver resolver = new BeanNameViewResolver();
+    resolver.setOrder(Ordered.LOWEST_PRECEDENCE - 10);
+    return resolver;
+}
+```
+
+> 如果想要返回页面；就会找error视图【**StaticView**】。(默认是一个白页)
+
+#### 异常处理流程
+
+1. 执行目标方法,请求URL:/basic_table,目标方法运行期间有任何异常都会被catch、而且标志当前请求结束；并且用 **dispatchException** 
+
+   ```
+   //进入DispatcherServlet.doDispatch方法
+   //可以看到现在捕获到异常如下
+   ```
+
+   ![](http://120.77.237.175:9080/photos/springboot/119.jpg)
+
+2. 进入视图解析流程（页面渲染？）
+
+   ```java
+   //无论是否有异常,都会执行目标方法,当有异常时,mv解析是为null,然后把上面捕获到的dispatchException异常保存起来,进去分析
+   processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+   
+   ======================================
+       private void processDispatchResult(HttpServletRequest request, HttpServletResponse response,
+   			@Nullable HandlerExecutionChain mappedHandler, @Nullable ModelAndView mv,
+   			@Nullable Exception exception) throws Exception {
+   
+   		boolean errorView = false;
+   	
+       	//exception:java.lang.ArithmeticException: / by zero
+   		if (exception != null) {
+               //判断上面的exption是否继承ModelAndViewDefiningException了,为false,跳过
+   			if (exception instanceof ModelAndViewDefiningException) {
+   				logger.debug("ModelAndViewDefiningException encountered", exception);
+   				mv = ((ModelAndViewDefiningException) exception).getModelAndView();
+   			}
+   			else {
+                   //handler为com.web.thymeleaf.controller.TableController#basic_table(int)
+   				Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
+                   //处理异常,mv默认为空,返回ModelAndView,进入分析
+   				mv = processHandlerException(request, response, handler, exception);
+   				errorView = (mv != null);
+   			}
+   		}
+   
+   		// Did the handler return a view to render?
+   		if (mv != null && !mv.wasCleared()) {
+   			render(mv, request, response);
+   			if (errorView) {
+   				WebUtils.clearErrorRequestAttributes(request);
+   			}
+   		}
+   		else {
+   			if (logger.isTraceEnabled()) {
+   				logger.trace("No view rendering, null ModelAndView returned.");
+   			}
+   		}
+   
+   		if (WebAsyncUtils.getAsyncManager(request).isConcurrentHandlingStarted()) {
+   			// Concurrent handling started during a forward
+   			return;
+   		}
+   
+   		if (mappedHandler != null) {
+   			// Exception (if any) is already handled..
+   			mappedHandler.triggerAfterCompletion(request, response, null);
+   		}
+   	}
+   ```
+
+3. **mv** = **processHandlerException**；处理handler发生的异常，处理完成返回ModelAndView；
+
+   1. 遍历所有的 **handlerExceptionResolvers，看谁能处理当前异常【HandlerExceptionResolver处理器异常解析器】**
+
+   ```java
+   	@Nullable
+   	protected ModelAndView processHandlerException(HttpServletRequest request, HttpServletResponse response,
+   			@Nullable Object handler, Exception ex) throws Exception {
+   
+   		// Success and error responses may use different content types
+   		request.removeAttribute(HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE);
+   
+   		//定义一个空的ModelAndView,最终返回
+   		ModelAndView exMv = null;
+           //判断异常解析器是否为空,所有的异常解析器如下
+           //可以看到this.handlerExceptionResolvers是HandlerExceptionResolver类型
+           //@Nullable private List<HandlerExceptionResolver> handlerExceptionResolvers;
+           //上面的DefaultErrorAttributes有继承过此接口
+   		if (this.handlerExceptionResolvers != null) {
+               //循环遍历所有的解析器看哪个可以处理,HandlerExceptionResolver接口如下
+   			for (HandlerExceptionResolver resolver : this.handlerExceptionResolvers) {
+                   //如何处理异常,继续进入研究
+   				exMv = resolver.resolveException(request, response, handler, ex);
+   				if (exMv != null) {	//判断不为null才会停止执行
+   					break;
+   				}
+   			}
+   		}
+   		if (exMv != null) {
+   			if (exMv.isEmpty()) {
+   				request.setAttribute(EXCEPTION_ATTRIBUTE, ex);
+   				return null;
+   			}
+   			// We might still need view name translation for a plain error model...
+   			if (!exMv.hasView()) {
+   				String defaultViewName = getDefaultViewName(request);
+   				if (defaultViewName != null) {
+   					exMv.setViewName(defaultViewName);
+   				}
+   			}
+   			if (logger.isTraceEnabled()) {
+   				logger.trace("Using resolved error view: " + exMv, ex);
+   			}
+   			else if (logger.isDebugEnabled()) {
+   				logger.debug("Using resolved error view: " + exMv);
+   			}
+   			WebUtils.exposeErrorRequestAttributes(request, ex, getServletName());
+   			return exMv;
+   		}
+   		//最终无法找到适合的异常解析器,抛出异常
+   		throw ex;
+   	}
+   ==============================================
+   //可以以看到异常解析器接口方法就只有一个
+   //实现其方法就只需把原生的request,response传进,handler是发生异常的handler,然后ex是所产生的异常
+   //最终方法返回ModelAndView
+   public interface HandlerExceptionResolver {
+   
+   	@Nullable
+   	ModelAndView resolveException(
+   			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex);
+   
+   }
+   ======================================
+       @Override
+   	public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response, Object handler,
+   			Exception ex) {
+       	//保存异常信息,继续进入
+   		storeErrorAttributes(request, ex);
+       	//最终保存完返回Null
+   		return null;
+   	}
+   
+   	//在请求域中设置异常,如下图
+   	private void storeErrorAttributes(HttpServletRequest request, Exception ex) {
+   		request.setAttribute(ERROR_ATTRIBUTE, ex);
+   	}
+   
+   ========================================
+    //当解析完DefaultErrorAttributes无法处理时,继续进入第二个解析器,第二个解析器包含了三个解器,继续遍历三个解析器
+       @Override
+   	@Nullable
+   	public ModelAndView resolveException(
+   			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex) {
+   
+   		if (this.resolvers != null) {
+   			for (HandlerExceptionResolver handlerExceptionResolver : this.resolvers) {
+                   //进入分析
+   				ModelAndView mav = handlerExceptionResolver.resolveException(request, response, handler, ex);
+   				if (mav != null) {
+   					return mav;
+   				}
+   			}
+   		}
+   		return null;
+   	}
+   
+   =================================================
+       //第一个解析器ExceptionHandlerExceptionResolver
+       @Override
+   	@Nullable
+   	public ModelAndView resolveException(
+   			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex) {
+   
+   		if (shouldApplyTo(request, handler)) {
+   			prepareResponse(ex, response);
+               //继续进入
+   			ModelAndView result = doResolveException(request, response, handler, ex);
+   			if (result != null) {
+   				// Print debug message when warn logger is not enabled.
+   				if (logger.isDebugEnabled() && (this.warnLogger == null || !this.warnLogger.isWarnEnabled())) {
+   					logger.debug("Resolved [" + ex + "]" + (result.isEmpty() ? "" : " to " + result));
+   				}
+   				// Explicitly configured warn logger in logException method.
+   				logException(ex, request);
+   			}
+   			return result;
+   		}
+   		else {
+   			return null;
+   		}
+   	}
+   
+   ================================
+   @Override
+   @Nullable
+   protected final ModelAndView doResolveException(
+       HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex) {
+       //可以继续进入研究,此方法是判断有没使用@ExceptionHandler注解,当前方法没有,因此最终返回null
+       return doResolveHandlerMethodException(request, response, (HandlerMethod) handler, ex);
+   }
+   ================================
+    //第二个解析器ResponseStatusExceptionResolver是标注了@ResponseStatus有异常时就返回错误码
+    //第三个也无法成功
+   ```
+
+   2. **系统默认的  异常解析器**
+
+   ![](http://120.77.237.175:9080/photos/springboot/120.jpg)
+
+   **DefaultErrorAttributes先来处理异常。把异常信息保存到request域，并且返回null；**
+
+   请求域中设置异常
+
+   ![](http://120.77.237.175:9080/photos/springboot/121.jpg)
+
+    **最终没有解析器可以处理我们的异常,把异常抛出**
+
+     1. **如果没有任何人能处理最终底层就会重新发发送 /error 请求。会被底层的BasicErrorController处理**
+
+     2. **解析错误视图；遍历所有的**  **ErrorViewResolver  看谁能解析。**
+
+     3. **默认的** **DefaultErrorViewResolver ,作用是把响应状态码作为错误页的地址，error/500.html** 
+
+     4. **模板引擎最终响应这个页面** **error/500.html** 
+
+        ```java
+        @RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
+        	public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
+        		HttpStatus status = getStatus(request);
+        		Map<String, Object> model = Collections
+        				.unmodifiableMap(getErrorAttributes(request, isIncludeStackTrace(request, MediaType.TEXT_HTML)));
+        		response.setStatus(status.value());
+                //解析错误视图
+        		ModelAndView modelAndView = resolveErrorView(request, response, status, model);
+        		return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
+        	}
+        =======================================
+            //遍历所有的ErrorViewResolver 看谁能解析,默认只有一个,上面分析,DefaultErrorViewResolver默认是底层已经加载了
+        protected ModelAndView resolveErrorView(HttpServletRequest request, HttpServletResponse response, HttpStatus status,
+        			Map<String, Object> model) {
+        		for (ErrorViewResolver resolver : this.errorViewResolvers) {
+                    //进入研究
+        			ModelAndView modelAndView = resolver.resolveErrorView(request, status, model);
+        			if (modelAndView != null) {
+        				return modelAndView;
+        			}
+        		}
+        		return null;
+        	}
+        ======================================
+            @Override
+        	public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
+            	//获取当前的状态码500
+        		ModelAndView modelAndView = resolve(String.valueOf(status.value()), model);
+        		if (modelAndView == null && SERIES_VIEWS.containsKey(status.series())) {
+                    //继续进入
+        			modelAndView = resolve(SERIES_VIEWS.get(status.series()), model);
+        		}
+        		return modelAndView;
+        	}
+        
+        	private ModelAndView resolve(String viewName, Map<String, Object> model) {
+                //进入error/下的500
+        		String errorViewName = "error/" + viewName;
+                //根据模引擎判断是否有此模板
+        		TemplateAvailabilityProvider provider = this.templateAvailabilityProviders.getProvider(errorViewName,
+        				this.applicationContext);
+        		if (provider != null) {
+        			return new ModelAndView(errorViewName, model);
+        		}
+                //有就成功返回,继续进入
+        		return resolveResource(errorViewName, model);
+        	}
+        
+        	private ModelAndView resolveResource(String viewName, Map<String, Object> model) {
+        		for (String location : this.resourceProperties.getStaticLocations()) {
+        			try {
+        				Resource resource = this.applicationContext.getResource(location);
+                        //最终返回带有html的页面资源
+        				resource = resource.createRelative(viewName + ".html");
+        				if (resource.exists()) {
+        					return new ModelAndView(new HtmlResourceView(resource), model);
+        				}
+        			}
+        			catch (Exception ex) {
+        			}
+        		}
+        		return null;
+        	}
+        ```
+
+        调用底层的DefaultErrorViewResolver解析器
+
+        ![](http://120.77.237.175:9080/photos/springboot/122.jpg)
 
 #### 定制错误响应页面 ####
 
@@ -6563,25 +8567,27 @@ ErrorViewResolver从哪里来的呢？
 
 比如我们在template文件夹下创建error/404.html当浏览器请求是404错误，就会使用我们创建的404.html页面响应，如果是其他状态码错误，还是使用默认的视图，但是如果404.html没有找到就会替换成4XX.html再查找一次，看`DefaultErrorViewResolver`中的静态代码块
 
-	static {
-		Map<Series, String> views = new EnumMap<>(Series.class);
-		views.put(Series.CLIENT_ERROR, "4xx");
-		views.put(Series.SERVER_ERROR, "5xx");
-		SERIES_VIEWS = Collections.unmodifiableMap(views);
+```java
+static {
+	Map<Series, String> views = new EnumMap<>(Series.class);
+	views.put(Series.CLIENT_ERROR, "4xx");
+	views.put(Series.SERVER_ERROR, "5xx");
+	SERIES_VIEWS = Collections.unmodifiableMap(views);
+}
+
+.....
+
+@Override
+public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
+	 //把状态码和model传过去过去视图
+	ModelAndView modelAndView = resolve(String.valueOf(status.value()), model);
+  //上面没有获取到视图就把状态吗替换再找，以4开头的替换为4xx，5开头替换为5xx，见下文（如果定制错误响应）
+	if (modelAndView == null && SERIES_VIEWS.containsKey(status.series())) {
+		modelAndView = resolve(SERIES_VIEWS.get(status.series()), model);
 	}
-	
-	.....
-	
-	@Override
-	public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
-		 //把状态码和model传过去过去视图
-		ModelAndView modelAndView = resolve(String.valueOf(status.value()), model);
-	  //上面没有获取到视图就把状态吗替换再找，以4开头的替换为4xx，5开头替换为5xx，见下文（如果定制错误响应）
-		if (modelAndView == null && SERIES_VIEWS.containsKey(status.series())) {
-			modelAndView = resolve(SERIES_VIEWS.get(status.series()), model);
-		}
-		return modelAndView;
-	}
+	return modelAndView;
+}
+```
 
 页面可以获取哪些数据?
 
@@ -6634,12 +8640,14 @@ ErrorViewResolver从哪里来的呢？
 
 `org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration`
 
-	@Bean
-	@ConditionalOnMissingBean(value = ErrorAttributes.class, search = SearchStrategy.CURRENT)
-	public DefaultErrorAttributes errorAttributes() {
-		//从配置中获取
-		return new DefaultErrorAttributes(this.serverProperties.getError().isIncludeException());
-	}
+```java
+@Bean
+@ConditionalOnMissingBean(value = ErrorAttributes.class, search = SearchStrategy.CURRENT)
+public DefaultErrorAttributes errorAttributes() {
+	//从配置中获取
+	return new DefaultErrorAttributes(this.serverProperties.getError().isIncludeException());
+}
+```
 
 没有模板引擎（模板引擎找不到这个错误页面），就会在静态资源文件夹下找；
 
