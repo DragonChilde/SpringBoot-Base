@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
  * 在配置文件中用<bean><bean/>标签添加组件
  *
  */
+//@Profile("dev")
 @Configuration
 public class MyConfig {
 

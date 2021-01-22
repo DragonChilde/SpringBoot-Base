@@ -1,3 +1,3 @@
-F:\Code\SpringBoot\SpringBoot-Starter-Define-Configure\src\main\java\com\springboot\starter\define\configure\SpringbootStarterDefineConfigureApplication.java
-F:\Code\SpringBoot\SpringBoot-Starter-Define-Configure\src\main\java\com\springboot\starter\define\configure\starter\HelloProperties.java
-F:\Code\SpringBoot\SpringBoot-Starter-Define-Configure\src\main\java\com\springboot\starter\define\configure\starter\HelloService.java
+D:\git\SpringBoot-Base\SpringBoot-Starter-Define-Configure\src\main\java\com\springboot\starter\define\configure\service\HelloService.java
+D:\git\SpringBoot-Base\SpringBoot-Starter-Define-Configure\src\main\java\com\springboot\starter\define\configure\auto\SpringbootStarterDefineConfiguration.java
+D:\git\SpringBoot-Base\SpringBoot-Starter-Define-Configure\src\main\java\com\springboot\starter\define\configure\bean\HelloProperties.java

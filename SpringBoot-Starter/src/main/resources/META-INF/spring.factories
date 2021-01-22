@@ -1,2 +1,3 @@
 org.springframework.boot.SpringApplicationRunListener=\ com.springboot.starter.springbootstarter.listener.TestSpringApplicationRunListener
 com.springboot.starter.springbootstarter.listener.TestSpringApplicationRunListener=\ com.springboot.starter.springbootstarter.listener.TestApplicationContextInitializer
+org.springframework.context.ApplicationListener=\ com.springboot.starter.springbootstarter.listener.TestApplicationListener

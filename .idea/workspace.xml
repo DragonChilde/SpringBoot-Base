@@ -19,8 +19,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="spring-beans.schema" />
         <option value="HTML File" />
+        <option value="spring-beans.schema" />
         <option value="Class" />
       </list>
     </option>
@@ -75,7 +75,23 @@
       <recent name="D:\git\SpringBoot-Base\SpringBoot-thymeleaf\src\main\resources\static" />
     </key>
   </component>
-  <component name="RunManager" selected="Spring Boot.ThymeleafApplication">
+  <component name="RunManager" selected="Spring Boot.SpringbootStarterApplication">
+    <configuration name="SpringbootDataJdbcApplicationTests.contextLoads" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="springboot-data-jdbc" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.springboot.data.jdbc.springbootdatajdbc.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.springboot.data.jdbc.springbootdatajdbc" />
+      <option name="MAIN_CLASS_NAME" value="com.springboot.data.jdbc.springbootdatajdbc.SpringbootDataJdbcApplicationTests" />
+      <option name="METHOD_NAME" value="contextLoads" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="AnnotationApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
       <module name="springboot-annotation" />
       <option name="SPRING_BOOT_MAIN_CLASS" value="com.sb.annotation.AnnotationApplication" />
@@ -181,6 +197,11 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="JUnit.SpringbootDataJdbcApplicationTests.contextLoads" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="SshConsoleOptionsProvider">
     <option name="myEncoding" value="UTF-8" />
@@ -216,6 +237,12 @@
       <workItem from="1610430421263" duration="7964000" />
       <workItem from="1610760411626" duration="2119000" />
       <workItem from="1610775551531" duration="10383000" />
+      <workItem from="1610952764672" duration="5350000" />
+      <workItem from="1610969005450" duration="2047000" />
+      <workItem from="1611043565703" duration="5116000" />
+      <workItem from="1611120793108" duration="7097000" />
+      <workItem from="1611192193454" duration="5519000" />
+      <workItem from="1611207776261" duration="14315000" />
     </task>
     <servers />
   </component>
@@ -231,18 +258,18 @@
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="777" y="227" key="#HTTP代理/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1609212159218" />
-    <state x="765" y="235" width="747" height="594" key="#com.intellij.ide.util.MemberChooser" timestamp="1610097838043">
+    <state x="765" y="235" width="747" height="594" key="#com.intellij.ide.util.MemberChooser" timestamp="1611221696192">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="765" y="235" width="747" height="594" key="#com.intellij.ide.util.MemberChooser/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610097838043" />
+    <state x="765" y="235" width="747" height="594" key="#com.intellij.ide.util.MemberChooser/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611221696192" />
     <state x="779" y="129" width="412" height="782" key="#com.intellij.openapi.keymap.impl.ui.EditKeymapsDialog" timestamp="1609300112420">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="779" y="129" width="412" height="782" key="#com.intellij.openapi.keymap.impl.ui.EditKeymapsDialog/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1609300112420" />
-    <state x="506" y="271" width="772" height="769" key="#xdebugger.evaluate" timestamp="1610437769601">
+    <state x="506" y="271" width="772" height="769" key="#xdebugger.evaluate" timestamp="1611217688254">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="506" y="271" width="772" height="769" key="#xdebugger.evaluate/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610437769601" />
+    <state x="506" y="271" width="772" height="769" key="#xdebugger.evaluate/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611217688254" />
     <state x="440" y="94" key="#项目结构" timestamp="1609810978255">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
@@ -263,62 +290,70 @@
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="502" y="178" key="GrepConsoleSettings/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1609293814315" />
-    <state width="1877" height="124" key="GridCell.Tab.0.bottom" timestamp="1610787363547">
+    <state width="1877" height="352" key="GridCell.Tab.0.bottom" timestamp="1611227020627">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.0.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.0.center" timestamp="1610787363547">
+    <state width="1877" height="226" key="GridCell.Tab.0.bottom/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
+    <state width="1877" height="352" key="GridCell.Tab.0.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020627" />
+    <state width="1877" height="352" key="GridCell.Tab.0.center" timestamp="1611227020627">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.0.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.0.left" timestamp="1610787363547">
+    <state width="1877" height="226" key="GridCell.Tab.0.center/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
+    <state width="1877" height="352" key="GridCell.Tab.0.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020626" />
+    <state width="1877" height="352" key="GridCell.Tab.0.left" timestamp="1611227020626">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.0.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.0.right" timestamp="1610787363547">
+    <state width="1877" height="226" key="GridCell.Tab.0.left/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
+    <state width="1877" height="352" key="GridCell.Tab.0.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020626" />
+    <state width="1877" height="352" key="GridCell.Tab.0.right" timestamp="1611227020627">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.0.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.1.bottom" timestamp="1610787363547">
+    <state width="1877" height="226" key="GridCell.Tab.0.right/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
+    <state width="1877" height="352" key="GridCell.Tab.0.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020627" />
+    <state width="1877" height="352" key="GridCell.Tab.1.bottom" timestamp="1611227020626">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.1.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.1.center" timestamp="1610787363547">
+    <state width="1877" height="226" key="GridCell.Tab.1.bottom/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
+    <state width="1877" height="352" key="GridCell.Tab.1.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020626" />
+    <state width="1877" height="352" key="GridCell.Tab.1.center" timestamp="1611227020626">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.1.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.1.left" timestamp="1610787363546">
+    <state width="1877" height="226" key="GridCell.Tab.1.center/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039508" />
+    <state width="1877" height="352" key="GridCell.Tab.1.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020626" />
+    <state width="1877" height="352" key="GridCell.Tab.1.left" timestamp="1611227020626">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.1.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363546" />
-    <state width="1877" height="124" key="GridCell.Tab.1.right" timestamp="1610787363547">
+    <state width="1877" height="226" key="GridCell.Tab.1.left/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039508" />
+    <state width="1877" height="352" key="GridCell.Tab.1.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020626" />
+    <state width="1877" height="352" key="GridCell.Tab.1.right" timestamp="1611227020626">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.1.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.2.bottom" timestamp="1610787363547">
+    <state width="1877" height="226" key="GridCell.Tab.1.right/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039508" />
+    <state width="1877" height="352" key="GridCell.Tab.1.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020626" />
+    <state width="1877" height="34" key="GridCell.Tab.2.bottom" timestamp="1611227020615">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.2.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.2.center" timestamp="1610787363547">
+    <state width="1877" height="34" key="GridCell.Tab.2.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020615" />
+    <state width="1877" height="34" key="GridCell.Tab.2.center" timestamp="1611227020615">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.2.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.2.left" timestamp="1610787363547">
+    <state width="1877" height="34" key="GridCell.Tab.2.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020615" />
+    <state width="1877" height="34" key="GridCell.Tab.2.left" timestamp="1611227020615">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.2.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
-    <state width="1877" height="124" key="GridCell.Tab.2.right" timestamp="1610787363547">
+    <state width="1877" height="34" key="GridCell.Tab.2.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020615" />
+    <state width="1877" height="34" key="GridCell.Tab.2.right" timestamp="1611227020615">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="124" key="GridCell.Tab.2.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610787363547" />
+    <state width="1877" height="34" key="GridCell.Tab.2.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020615" />
     <state x="461" y="164" key="SettingsEditor" timestamp="1609384925318">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="461" y="164" key="SettingsEditor/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1609384925318" />
-    <state x="261" y="161" width="1354" height="693" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2" timestamp="1610785275505">
+    <state x="261" y="161" width="1354" height="693" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2" timestamp="1610957331916">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="261" y="161" width="1354" height="693" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610785275505" />
+    <state x="261" y="161" width="1354" height="693" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610957331916" />
     <state x="662" y="94" width="675" height="852" key="find.popup" timestamp="1610006447473">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
@@ -327,10 +362,10 @@
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="289" y="102" key="new project wizard/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610329251367" />
-    <state x="561" y="326" width="672" height="678" key="search.everywhere.popup" timestamp="1610785619526">
+    <state x="561" y="326" width="672" height="678" key="search.everywhere.popup" timestamp="1611125294807">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="561" y="326" width="672" height="678" key="search.everywhere.popup/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610785619526" />
+    <state x="561" y="326" width="672" height="678" key="search.everywhere.popup/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611125294807" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -384,11 +419,6 @@
           <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-core/5.2.12.RELEASE/spring-core-5.2.12.RELEASE-sources.jar!/org/springframework/core/convert/support/StringToNumberConverterFactory.java</url>
           <line>63</line>
           <option name="timeStamp" value="41" />
-        </line-breakpoint>
-        <line-breakpoint type="java-line">
-          <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-web/5.2.12.RELEASE/spring-web-5.2.12.RELEASE-sources.jar!/org/springframework/web/method/support/HandlerMethodReturnValueHandlerComposite.java</url>
-          <line>77</line>
-          <option name="timeStamp" value="48" />
         </line-breakpoint>
         <line-breakpoint type="java-line">
           <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-webmvc/5.2.12.RELEASE/spring-webmvc-5.2.12.RELEASE-sources.jar!/org/springframework/web/servlet/mvc/method/annotation/ServletInvocableHandlerMethod.java</url>
@@ -470,12 +500,12 @@
           <line>166</line>
           <option name="timeStamp" value="82" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
+        <line-breakpoint type="java-line">
           <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-webmvc/5.2.12.RELEASE/spring-webmvc-5.2.12.RELEASE-sources.jar!/org/springframework/web/servlet/DispatcherServlet.java</url>
           <line>1000</line>
           <option name="timeStamp" value="85" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
+        <line-breakpoint type="java-line">
           <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-webmvc/5.2.12.RELEASE/spring-webmvc-5.2.12.RELEASE-sources.jar!/org/springframework/web/servlet/DispatcherServlet.java</url>
           <line>1039</line>
           <option name="timeStamp" value="86" />
@@ -500,15 +530,38 @@
           <line>88</line>
           <option name="timeStamp" value="96" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
+        <line-breakpoint type="java-line">
           <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-webmvc/5.2.12.RELEASE/spring-webmvc-5.2.12.RELEASE-sources.jar!/org/springframework/web/servlet/mvc/method/annotation/ServletInvocableHandlerMethod.java</url>
           <line>104</line>
           <option name="timeStamp" value="97" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
+        <line-breakpoint type="java-line">
           <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-webmvc/5.2.12.RELEASE/spring-webmvc-5.2.12.RELEASE-sources.jar!/org/springframework/web/servlet/mvc/method/annotation/ServletInvocableHandlerMethod.java</url>
           <line>105</line>
           <option name="timeStamp" value="98" />
+        </line-breakpoint>
+        <line-breakpoint type="java-line">
+          <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-webmvc/5.2.12.RELEASE/spring-webmvc-5.2.12.RELEASE-sources.jar!/org/springframework/web/servlet/handler/HandlerExceptionResolverComposite.java</url>
+          <line>78</line>
+          <option name="timeStamp" value="99" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-web/5.2.12.RELEASE/spring-web-5.2.12.RELEASE-sources.jar!/org/springframework/web/method/support/HandlerMethodReturnValueHandlerComposite.java</url>
+          <line>77</line>
+          <option name="timeStamp" value="100" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/spring-webmvc/5.2.12.RELEASE/spring-webmvc-5.2.12.RELEASE-sources.jar!/org/springframework/web/servlet/DispatcherServlet.java</url>
+          <line>1298</line>
+          <option name="timeStamp" value="101" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-method">
+          <url>jar://$PROJECT_DIR$/../../Server/LocalRepository/org/springframework/boot/spring-boot/2.3.7.RELEASE/spring-boot-2.3.7.RELEASE-sources.jar!/org/springframework/boot/web/servlet/context/ServletWebServerApplicationContext.java</url>
+          <line>172</line>
+          <properties class="org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext" method="createWebServer">
+            <option name="EMULATED" value="true" />
+          </properties>
+          <option name="timeStamp" value="102" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

@@ -1,4 +1,4 @@
-com\springboot\starter\define\configure\starter\HelloProperties.class
-com\springboot\starter\define\configure\starter\HelloService.class
-com\springboot\starter\define\configure\SpringbootStarterDefineConfigureApplication.class
+com\springboot\starter\define\configure\service\HelloService.class
+com\springboot\starter\define\configure\bean\HelloProperties.class
 META-INF\spring-configuration-metadata.json
+com\springboot\starter\define\configure\auto\SpringbootStarterDefineConfiguration.class

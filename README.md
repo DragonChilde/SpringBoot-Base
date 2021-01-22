@@ -1020,27 +1020,39 @@ Spring Boot里面没有Spring的配置文件，我们自己编写的配置文件
 
 我们在主配置文件编写的时候，文件名可以是   application-{profile}.properties/yml
 
-默认使用application.properties的配置；
+- 默认使用application.properties的配置；
+- 定环境配置文件  application-{env}.yaml
+- 激活指定环境
+
+- - 配置文件激活
+  - 命令行激活：java -jar xxx.jar --**spring.profiles.active=prod  --person.name=haha**
+
+- - - **修改配置文件的任意值，命令行优先**
+
+- 默认配置与环境配置同时生效
+- 同名配置项，profile配置优先
 
 ### yml支持多文档块方式 ###
 
-	spring:
-	  profiles:
-	    active: pro	#启用名为pro的配置
-	
-	---
-	
-	server:
-	  port: 8084
-	spring:
-	  profiles: pro
-	
-	---
-	
-	server:
-	  port: 8085
-	spring:
-	  profiles: dev #指定属于哪个环境
+```java
+spring:
+  profiles:
+    active: pro	#启用名为pro的配置
+
+---
+
+server:
+  port: 8084
+spring:
+  profiles: pro
+
+---
+
+server:
+  port: 8085
+spring:
+  profiles: dev #指定属于哪个环境
+```
 
 ### 激活指定profile ###
 
@@ -1048,7 +1060,7 @@ Spring Boot里面没有Spring的配置文件，我们自己编写的配置文件
 
 	![](http://120.77.237.175:9080/photos/springboot/18.jpg)
 
-2. 命令行java -jar springboot-config-0.0.1-SNAPSHOT.jar --spring.profiles.active=pro；
+2. 命令行`java -jar springboot-config-0.0.1-SNAPSHOT.jar --spring.profiles.active=pro`；
 
 3. 通过执行命令行
 
@@ -1059,6 +1071,39 @@ Spring Boot里面没有Spring的配置文件，我们自己编写的配置文件
 ​	-Dspring.profiles.active=dev
 ​	
 ![](http://120.77.237.175:9080/photos/springboot/20.jpg)
+
+### @Profile条件装配功能
+
+```java
+//@Profile("dev")	//当配置在类上时,在指定激活dev时,整个类包括其下的方法都会生效
+@Configuration
+public class MyConfig {
+
+    //@Profile("dev")	//当配置在方法上时,在指定激活dev时,只针对当前方法生效
+    //将方法的返回值添加到容器中；容器中这个组件默认的id就是方法名
+    @Bean
+    public Hello hello02()
+    {
+        return new Hello();
+    }
+}
+```
+
+### profile分组
+
+```java
+#当指定激活myprod,其组下的所有配置都会生效
+spring..profile.active=myprod
+
+#指定分组,把dev和pro配置分到同一个组
+spring.profiles.group.myprod[0]=dev
+spring.profiles.group.myprod[1]=pro
+
+#把test分到另一个组
+spring.profiles.group.mytest[0]=test
+```
+
+
 
 ## 配置文件加载位置 ##
 
@@ -1133,8 +1178,6 @@ SpringBoot会从这四个位置全部加载主配置文件；**互补配置**；
 
 9. **jar包内部的application.properties或application.yml(不带spring.profile)配置文件**
 
-
-
 10. @Configuration注解类上的@PropertySource
 
 11. 通过SpringApplication.setDefaultProperties指定的默认属性
@@ -1142,6 +1185,25 @@ SpringBoot会从这四个位置全部加载主配置文件；**互补配置**；
 所有支持的配置加载来源；
 
 <a href="https://docs.spring.io/spring-boot/docs/2.2.6.RELEASE/reference/html/spring-boot-features.html#boot-features-external-config">[参考官方文档]</a>
+
+1. 外部配置源
+
+   常用：**Java属性文件**、**YAML文件**、**环境变量**、**命令行参数**；
+
+2. 配置文件查找位置(后面的优先前面的)
+   1. classpath 根路径
+   2. classpath根路径下config目录
+   3. jar包当前目录
+   4. jar包当前目录的config目录
+   5. /config子目录的直接子目录(Linux根目录下的config)
+
+3. 配置文件加载顺序
+   1. 当前jar包内部的application.properties和application.yml
+   2. 当前jar包内部的application-{profile}.properties 和 application-{profile}.yml
+   3. 引用的外部jar包的application.properties和application.yml
+   4. 引用的外部jar包的application-{profile}.properties 和 application-{profile}.yml
+
+4. **指定环境优先，外部优先，后面的可以覆盖前面的同名配置项**
 
 ## 自动配置原理 ##
 
@@ -7995,8 +8057,6 @@ public class DefaultErrorAttributes implements ErrorAttributes, HandlerException
 }
 ```
 
-
-
 ##### ErrorPageCustomizer #####
 
 ```java
@@ -8561,7 +8621,9 @@ public BeanNameViewResolver beanNameViewResolver() {
 
         ![](http://120.77.237.175:9080/photos/springboot/122.jpg)
 
-#### 定制错误响应页面 ####
+#### 定制错误处理逻辑
+
+###### 定制错误响应页面 ######
 
 有模板引擎的情况下；将错误页面命名为 `错误状态码.html` 放在模板引擎文件夹里面的 error文件夹下发生此状态码的错误就会来到这里找对应的页面；
 
@@ -8591,37 +8653,43 @@ public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus stat
 
 页面可以获取哪些数据?
 
-#### DefaultErrorAttributes ####
+###### DefaultErrorAttributes ######
 
 再看一下`BasicErrorController`的`errorHtml`方法
 
-	@RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
-	public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
-		HttpStatus status = getStatus(request);
-		Map<String, Object> model = Collections
-				.unmodifiableMap(getErrorAttributes(request, isIncludeStackTrace(request, MediaType.TEXT_HTML)));
-		response.setStatus(status.value());
-		ModelAndView modelAndView = resolveErrorView(request, response, status, model);
-		return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
-	}
+```java
+@RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
+public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
+	HttpStatus status = getStatus(request);
+	Map<String, Object> model = Collections
+			.unmodifiableMap(getErrorAttributes(request, isIncludeStackTrace(request, MediaType.TEXT_HTML)));
+	response.setStatus(status.value());
+	ModelAndView modelAndView = resolveErrorView(request, response, status, model);
+	return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
+}
+```
 
 看一下调用的`getErrorAttributes()`方法
 
-	protected Map<String, Object> getErrorAttributes(HttpServletRequest request, boolean includeStackTrace) {
-		WebRequest webRequest = new ServletWebRequest(request);
-		return this.errorAttributes.getErrorAttributes(webRequest, includeStackTrace);
-	}
+```java
+protected Map<String, Object> getErrorAttributes(HttpServletRequest request, boolean includeStackTrace) {
+	WebRequest webRequest = new ServletWebRequest(request);
+	return this.errorAttributes.getErrorAttributes(webRequest, includeStackTrace);
+}
+```
 
 再看`this.errorAttributes.getErrorAttributes()`方法， `this.errorAttributes`是接口类型`ErrorAttributes`，实现类就一个`DefaultErrorAttributes`，看一下`DefaultErrorAttributes`的 `getErrorAttributes()`方法
 
-	public Map<String, Object> getErrorAttributes(WebRequest webRequest, boolean includeStackTrace) {
-		Map<String, Object> errorAttributes = new LinkedHashMap<>();
-		errorAttributes.put("timestamp", new Date());
-		addStatus(errorAttributes, webRequest);
-		addErrorDetails(errorAttributes, webRequest, includeStackTrace);
-		addPath(errorAttributes, webRequest);
-		return errorAttributes;
-	}
+```java
+public Map<String, Object> getErrorAttributes(WebRequest webRequest, boolean includeStackTrace) {
+	Map<String, Object> errorAttributes = new LinkedHashMap<>();
+	errorAttributes.put("timestamp", new Date());
+	addStatus(errorAttributes, webRequest);
+	addErrorDetails(errorAttributes, webRequest, includeStackTrace);
+	addPath(errorAttributes, webRequest);
+	return errorAttributes;
+}
+```
 
 - timestamp：时间戳
 - status：状态码
@@ -8659,7 +8727,7 @@ public DefaultErrorAttributes errorAttributes() {
 
 ![](http://120.77.237.175:9080/photos/springboot/50.jpg)
 
-#### 如何定制错误的json数据 ####
+###### 如何定制错误的json数据 ######
 
 1. 第一种方法，定义全局异常处理器类注入到容器中，捕获到异常返回json格式的数据
 
@@ -8797,8 +8865,249 @@ public DefaultErrorAttributes errorAttributes() {
 	
 	![](http://120.77.237.175:9080/photos/springboot/53.jpg)
 
+###### @ControllerAdvice+@ExceptionHandler处理全局异常
 
-### 配置嵌入式Servlet容器 ###
+```java
+@Slf4j
+@ControllerAdvice/** 增强类,自动加载到容器中* */
+public class GlobalExceptionHandler {
+
+  @ExceptionHandler({ArithmeticException.class, NullPointerException.class}) // 所要处理的异常
+   /**
+   * 返回也可以是ModelAndView 就可以带视图也可以带模型数据
+   */
+  public String handleArithException(Exception e) {
+    log.error("异常是:{}", e);
+    return "login";	//视图地址
+  }
+}
+```
+
+**原理分析**
+
+上面异常处理流程已经有所介绍,这里所使用的就是`ExceptionHandlerExceptionResolver`的异常处理解析器,其父类`AbstractHandlerExceptionResolver`下的哪里标注了`@ExceptionHandler`来处理异常
+
+```java
+	//在异常处理中,循环寻找错误解析器最终会找到ExceptionHandlerExceptionResolver来处理异常
+	@Override
+	@Nullable
+	public ModelAndView resolveException(
+			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex) {
+
+		if (shouldApplyTo(request, handler)) {
+			prepareResponse(ex, response);
+			ModelAndView result = doResolveException(request, response, handler, ex);
+			if (result != null) {
+				// Print debug message when warn logger is not enabled.
+				if (logger.isDebugEnabled() && (this.warnLogger == null || !this.warnLogger.isWarnEnabled())) {
+					logger.debug("Resolved [" + ex + "]" + (result.isEmpty() ? "" : " to " + result));
+				}
+				// Explicitly configured warn logger in logException method.
+				logException(ex, request);
+			}
+			return result;
+		}
+		else {
+			return null;
+		}
+	}
+```
+
+###### @ResponseStatus+自定义异常
+
+```java
+//自定义返回状态码和错误信息
+@ResponseStatus(value = HttpStatus.FORBIDDEN, reason = "用户数量太多")
+public class UserTooManyException extends RuntimeException {
+  public UserTooManyException() {}
+
+  public UserTooManyException(String message) {
+    super(message);
+  }
+}
+```
+
+原理分析
+
+也是一样直接进入循环异常处理解析器,寻找哪个解析器可以处理,最终找到`ResponseStatusExceptionResolver`,直接进入`doResolveException`看是如何处理
+
+```java
+@Nullable
+protected ModelAndView doResolveException(
+      HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex) {
+
+   try {
+       //判断我们上面定义的是否继承了ResponseStatusException,直接跳过
+      if (ex instanceof ResponseStatusException) {
+         return resolveResponseStatusException((ResponseStatusException) ex, request, response, handler);
+      }
+	//使用工具类寻找是否使用了ResponseStatus注解,判断为true
+      ResponseStatus status = AnnotatedElementUtils.findMergedAnnotation(ex.getClass(), ResponseStatus.class);
+      if (status != null) {
+          //返回ModelAndView对象,点击进去
+         return resolveResponseStatus(status, request, response, handler, ex);
+      }
+
+      if (ex.getCause() instanceof Exception) {
+         return doResolveException(request, response, handler, (Exception) ex.getCause());
+      }
+   }
+   catch (Exception resolveEx) {
+      if (logger.isWarnEnabled()) {
+         logger.warn("Failure while trying to resolve exception [" + ex.getClass().getName() + "]", resolveEx);
+      }
+   }
+   return null;
+}
+========================================
+    protected ModelAndView resolveResponseStatus(ResponseStatus responseStatus, HttpServletRequest request,
+			HttpServletResponse response, @Nullable Object handler, Exception ex) throws Exception {
+		//这里是获取我们上面注解的信息
+		int statusCode = responseStatus.code().value();
+		String reason = responseStatus.reason();
+    	//继续进入
+		return applyStatusAndReason(statusCode, reason, response);
+	}
+================================================
+protected ModelAndView applyStatusAndReason(int statusCode, @Nullable String reason, HttpServletResponse response)
+			throws IOException {
+
+		if (!StringUtils.hasLength(reason)) {
+			response.sendError(statusCode);
+		}
+		else {
+			String resolvedReason = (this.messageSource != null ?
+					this.messageSource.getMessage(reason, null, reason, LocaleContextHolder.getLocale()) :
+					reason);
+            //注意:底层这里直接使用转发/error请求,发信息叫由Tomcat进行转发
+			response.sendError(statusCode, resolvedReason);
+		}
+    	//最终返回一个空的ModelAndView视图,结果是没有找到处理器处理,实际已经把所有的错误信息获取到了交给tomcat
+		return new ModelAndView();
+	}
+```
+
+###### DefaultHandlerExceptionResolver
+
+Spring底层的异常
+
+访问url:/basic_table不带参数,触发底层异常
+
+```java
+	//下面是DefaultHandlerExceptionResolver判断的异常,都是根据当前异常类型去判断属于哪个异常
+	@Override
+	@Nullable
+	protected ModelAndView doResolveException(
+			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex) {
+
+		try {
+			if (ex instanceof HttpRequestMethodNotSupportedException) {
+				return handleHttpRequestMethodNotSupported(
+						(HttpRequestMethodNotSupportedException) ex, request, response, handler);
+			}
+			else if (ex instanceof HttpMediaTypeNotSupportedException) {
+				return handleHttpMediaTypeNotSupported(
+						(HttpMediaTypeNotSupportedException) ex, request, response, handler);
+			}
+			else if (ex instanceof HttpMediaTypeNotAcceptableException) {
+				return handleHttpMediaTypeNotAcceptable(
+						(HttpMediaTypeNotAcceptableException) ex, request, response, handler);
+			}
+			else if (ex instanceof MissingPathVariableException) {
+				return handleMissingPathVariable(
+						(MissingPathVariableException) ex, request, response, handler);
+			}
+            //最终找到当前的异常是缺少请求参数
+			else if (ex instanceof MissingServletRequestParameterException) {
+                //进入研究
+				return handleMissingServletRequestParameter(
+						(MissingServletRequestParameterException) ex, request, response, handler);
+			}
+			else if (ex instanceof ServletRequestBindingException) {
+				return handleServletRequestBindingException(
+						(ServletRequestBindingException) ex, request, response, handler);
+			}
+			else if (ex instanceof ConversionNotSupportedException) {
+				return handleConversionNotSupported(
+						(ConversionNotSupportedException) ex, request, response, handler);
+			}
+			else if (ex instanceof TypeMismatchException) {
+				return handleTypeMismatch(
+						(TypeMismatchException) ex, request, response, handler);
+			}
+			else if (ex instanceof HttpMessageNotReadableException) {
+				return handleHttpMessageNotReadable(
+						(HttpMessageNotReadableException) ex, request, response, handler);
+			}
+			else if (ex instanceof HttpMessageNotWritableException) {
+				return handleHttpMessageNotWritable(
+						(HttpMessageNotWritableException) ex, request, response, handler);
+			}
+			else if (ex instanceof MethodArgumentNotValidException) {
+				return handleMethodArgumentNotValidException(
+						(MethodArgumentNotValidException) ex, request, response, handler);
+			}
+			else if (ex instanceof MissingServletRequestPartException) {
+				return handleMissingServletRequestPartException(
+						(MissingServletRequestPartException) ex, request, response, handler);
+			}
+			else if (ex instanceof BindException) {
+				return handleBindException((BindException) ex, request, response, handler);
+			}
+			else if (ex instanceof NoHandlerFoundException) {
+				return handleNoHandlerFoundException(
+						(NoHandlerFoundException) ex, request, response, handler);
+			}
+			else if (ex instanceof AsyncRequestTimeoutException) {
+				return handleAsyncRequestTimeoutException(
+						(AsyncRequestTimeoutException) ex, request, response, handler);
+			}
+		}
+		catch (Exception handlerEx) {
+			if (logger.isWarnEnabled()) {
+				logger.warn("Failure while trying to resolve exception [" + ex.getClass().getName() + "]", handlerEx);
+			}
+		}
+		return null;
+	}
+
+===============================
+    //可以看到最终也是转发/error请求交由Tomcat处理,返回空的ModelAndView
+    protected ModelAndView handleMissingServletRequestParameter(MissingServletRequestParameterException ex,
+			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
+
+		response.sendError(HttpServletResponse.SC_BAD_REQUEST, ex.getMessage());
+		return new ModelAndView();
+	}
+```
+
+###### 自定义错误解析器
+
+```java
+//根据上面的默认错误解析器,我们也可以定义符合自身的异常解析器
+//注意虽然我们定义的解析器已经加载进去了,但因为优先级的问题,自定义的解析器排最后,进入不到我们定义的解析器,因此必须把优先级调高
+@Order(value = Ordered.HIGHEST_PRECEDENCE) // 优先级，数字越小优先级越高
+@Component
+public class CustomerHandlerExceptionResolver implements HandlerExceptionResolver {
+  @Override
+  public ModelAndView resolveException(
+      HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+
+    try {
+      response.sendError(511, "自定义的错误解析器");
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    return new ModelAndView();
+  }
+}
+```
+
+![](http://120.77.237.175:9080/photos/springboot/123.jpg)
+
+### Web原生组件注入（Servlet、Filter、Listener）
+
 SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 
 ![](http://120.77.237.175:9080/photos/springboot/54.jpg)
@@ -8837,86 +9146,255 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 
 #### 注册Servlet三大组件 ####
 
+##### 使用Servlet API注解方式
+
+###### @WebFilter
+
+```java
+@Slf4j
+@WebFilter(urlPatterns = {"/css/*", "/images/*"})	//参数是要拦截的路径
+public class MyFilter implements Filter {
+  @Override
+  public void doFilter(
+      ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain)
+      throws IOException, ServletException {
+
+    log.info("MyFilter工作");
+    filterChain.doFilter(servletRequest, servletResponse);
+  }
+
+  @Override
+  public void init(FilterConfig filterConfig) throws ServletException {
+    log.info("MyFilter初始化完成");
+  }
+
+  @Override
+  public void destroy() {
+    log.info("MyFilter销毁");
+  }
+}
+```
+
+###### @WebListener
+
+```java
+@Slf4j
+@WebListener
+public class MySwervletContextListener implements ServletContextListener {
+    @Override
+    public void contextInitialized(ServletContextEvent sce) {
+
+        log.info("MySwervletContextListener监听到项目初始化完成");
+    }
+
+    @Override
+    public void contextDestroyed(ServletContextEvent sce) {
+
+        log.info("MySwervletContextListener监听到项目销毁");
+    }
+}
+```
+
+###### @WebServlet
+
+```java
+@WebServlet(urlPatterns = "/my")	//参数是要拦截的路径
+public class MyServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.getWriter().write("66666");
+    }
+}
+```
+
+###### @ServletComponentScan
+
+**最后使在SpringBoot启动类上`@ServletComponentScan(basePackages = "com.web.thymeleaf")`定义要扫描的组件路径,才能把以上的注解方式加入到容器中**
+
+> 推荐这种方式
+
+##### RegistrationBean配置方式
+
 由于`SpringBoot`默认是以jar包的方式启动嵌入式的`Servlet`容器来启动`SpringBoot`的web应用，没有`web.xml`文件
 
 注册三大组件用以下方式
 
-- **Servlet**
+- ###### **Servlet**
 
-		public class MyServlet  extends HttpServlet {
-		    @Override
-		    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		
-		        doPost(req,resp);
-		    }
-		
-		    @Override
-		    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		        resp.getWriter().write("hello world!");
-		    }
-		}
-	
-	向容器中添加`ServletRegistrationBean`
+  ```java
+  public class MyServlet  extends HttpServlet {
+      @Override
+      protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+  
+          doPost(req,resp);
+      }
+  
+      @Override
+      protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+          resp.getWriter().write("hello world!");
+      }
+  }
+  ```
 
-		   @Bean
-		public ServletRegistrationBean myServlet()
-		{
-		    return new ServletRegistrationBean(new MyServlet(), "/myServlet");
-		
-		}
+  向容器中添加`ServletRegistrationBean`
+
+  ```java
+   @Bean
+  public ServletRegistrationBean myServlet()
+  {
+      return new ServletRegistrationBean(new MyServlet(), "/myServlet");	//后面的参数是需要拦截的路径
+  }
+  ```
 
 - **Filter**
 
-		public class MyFilter implements Filter {
-		    @Override
-		    public void init(FilterConfig filterConfig) throws ServletException {
-		    }
-		
-		    @Override
-		    public void destroy() {
-		    }
-		
-		    @Override
-		    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
-		        System.out.println("doFilter.....");
-		    }
-		}
+  ```java
+  public class MyFilter implements Filter {
+      @Override
+      public void init(FilterConfig filterConfig) throws ServletException {
+      }
+  
+      @Override
+      public void destroy() {
+      }
+  
+      @Override
+      public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+          System.out.println("doFilter.....");
+      }
+  }
+  ```
 
-	向容器中添加`FilterRegistrationBean`
+  向容器中添加`FilterRegistrationBean`
 
-	    @Bean
-	    public FilterRegistrationBean myFilter()
-	    {
-	        FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean();
-	        filterRegistrationBean.setFilter(new MyFilter());
-	        filterRegistrationBean.setUrlPatterns(Arrays.asList("/myFilter"));
-	        return filterRegistrationBean;
-	    }
+  ```java
+  @Bean
+  public FilterRegistrationBean myFilter()
+  {
+      FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean();
+      filterRegistrationBean.setFilter(new MyFilter());
+      filterRegistrationBean.setUrlPatterns(Arrays.asList("/myFilter"));	//设置需要拦截的路径集合
+      return filterRegistrationBean;
+  }
+  ```
 
 - **Listener**
 
-		public class MyListener implements ServletContextListener {
-		    @Override
-		    public void contextInitialized(ServletContextEvent sce) {
-		        System.out.println("contextInitialized...web启动");
-		    }
-		
-		    @Override
-		    public void contextDestroyed(ServletContextEvent sce) {
-		        System.out.println("contextDestroyed....项目销毁");
-		    }
-		}
+	```java
+	public class MyListener implements ServletContextListener {
+	    @Override
+	    public void contextInitialized(ServletContextEvent sce) {
+	        System.out.println("contextInitialized...web启动");
+	    }
+	
+	    @Override
+	    public void contextDestroyed(ServletContextEvent sce) {
+	        System.out.println("contextDestroyed....项目销毁");
+	    }
+}
+	```
 
 	向容器中注入`ServletListenerRegistrationBean`
+	
+	```java
+	@Bean
+	public ServletListenerRegistrationBean myListener()
+	{
+	    return new ServletListenerRegistrationBean<>(new MyListener());
+	
+	}
+	```
 
-	    @Bean
-	    public ServletListenerRegistrationBean myListener()
-	    {
-	        return new ServletListenerRegistrationBean<>(new MyListener());
-	    
-	    }
+> 注意:在@Configuration配置类上(proxyBeanMethods = true)：保证依赖的三大组件始终是单实例的
 
-#### 替换为其他嵌入式Servlet容器 ####
+##### 扩展：DispatchServlet 如何注册进来
+
+- 容器中自动配置了  DispatcherServlet  属性绑定到 WebMvcProperties；对应的配置文件配置项是 **spring.mvc。**
+
+- **通过** **ServletRegistrationBean**<DispatcherServlet> 把 DispatcherServlet  配置进来。
+
+- 默认映射的是 / 路径。
+
+查看源码`DispatcherServletAutoConfiguration`
+
+```java
+public class DispatcherServletAutoConfiguration {
+    public static final String DEFAULT_DISPATCHER_SERVLET_BEAN_NAME = "dispatcherServlet";
+	...
+        
+        	@Configuration(proxyBeanMethods = false)
+	@Conditional(DefaultDispatcherServletCondition.class)
+	@ConditionalOnClass(ServletRegistration.class)
+	@EnableConfigurationProperties(WebMvcProperties.class)
+	protected static class DispatcherServletConfiguration {
+
+        //注册组件 name为dispatcherServlet
+		@Bean(name = DEFAULT_DISPATCHER_SERVLET_BEAN_NAME)
+		public DispatcherServlet dispatcherServlet(WebMvcProperties webMvcProperties) {
+            //以下是绑定属性到spring.mvc里(WebMvcProperties)
+			DispatcherServlet dispatcherServlet = new DispatcherServlet();
+			dispatcherServlet.setDispatchOptionsRequest(webMvcProperties.isDispatchOptionsRequest());
+			dispatcherServlet.setDispatchTraceRequest(webMvcProperties.isDispatchTraceRequest());
+			dispatcherServlet.setThrowExceptionIfNoHandlerFound(webMvcProperties.isThrowExceptionIfNoHandlerFound());
+			dispatcherServlet.setPublishEvents(webMvcProperties.isPublishRequestHandledEvents());
+			dispatcherServlet.setEnableLoggingRequestDetails(webMvcProperties.isLogRequestDetails());
+			return dispatcherServlet;
+		}
+
+		@Bean
+		@ConditionalOnBean(MultipartResolver.class)
+		@ConditionalOnMissingBean(name = DispatcherServlet.MULTIPART_RESOLVER_BEAN_NAME)
+		public MultipartResolver multipartResolver(MultipartResolver resolver) {
+			// Detect if the user has created a MultipartResolver but named it incorrectly
+			return resolver;
+		}
+
+	}
+    
+    
+    @Configuration(proxyBeanMethods = false)
+	@Conditional(DispatcherServletRegistrationCondition.class)
+	@ConditionalOnClass(ServletRegistration.class)
+	@EnableConfigurationProperties(WebMvcProperties.class)
+	@Import(DispatcherServletConfiguration.class)
+	protected static class DispatcherServletRegistrationConfiguration {
+
+		@Bean(name = DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME)
+		@ConditionalOnBean(value = DispatcherServlet.class, name = DEFAULT_DISPATCHER_SERVLET_BEAN_NAME)
+        //点击DispatcherServletRegistrationBean进入可以看到继承了ServletRegistrationBean<DispatcherServlet>
+		public DispatcherServletRegistrationBean dispatcherServletRegistration(DispatcherServlet dispatcherServlet,
+				WebMvcProperties webMvcProperties, ObjectProvider<MultipartConfigElement> multipartConfig) {
+            //dispatcherServlet从容器里获取里的
+            //webMvcProperties.getServlet().getPath(),默认配置的属性是 "/";
+			DispatcherServletRegistrationBean registration = new DispatcherServletRegistrationBean(dispatcherServlet,
+					webMvcProperties.getServlet().getPath());
+			registration.setName(DEFAULT_DISPATCHER_SERVLET_BEAN_NAME);
+			registration.setLoadOnStartup(webMvcProperties.getServlet().getLoadOnStartup());
+			multipartConfig.ifAvailable(registration::setMultipartConfig);
+			return registration;
+		}
+
+	}
+    ...
+}
+```
+
+
+
+```
+Tomcat-Servlet；
+多个Servlet都能处理到同一层路径，精确优选原则,下面有两个Servlet A和B,当访问的路径为/my/1时会交由B的Servlet处理,同理A
+A： /my/
+B： /my/1
+如下图,当访问的路径为/my的时候,会直接交由Tomcat的MyServlet的处理,而不会经过Spring的DispatcherServlet
+```
+
+![](http://120.77.237.175:9080/photos/springboot/124.png)
+
+#### 嵌入式Servlet容器
+
+##### 替换为其他嵌入式Servlet容器 #####
 
 如果要换成其他的就把Tomcat的依赖排除掉，然后引入其他嵌入式`Servlet`容器的以来，如`Jetty`，`Undertow`
 
@@ -8924,153 +9402,181 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 
 - **Tomcat（默认使用）**
 
-		<dependency>
-		    <groupId>org.springframework.boot</groupId>
-		    <artifactId>spring-boot-starter-web</artifactId>
-			引入web模块默认就是使用嵌入式的Tomcat作为Servlet容器；
-		</dependency>
+	```java
+	<dependency>
+	    <groupId>org.springframework.boot</groupId>
+	    <artifactId>spring-boot-starter-web</artifactId>
+		//引入web模块默认就是使用嵌入式的Tomcat作为Servlet容器；
+	</dependency>
+	```
 
 
 - **Jetty**
 
-		<!-- 引入web模块 -->
-		 <dependency>
-		    <groupId>org.springframework.boot</groupId>
-		    <artifactId>spring-boot-starter-web</artifactId>
-		    <exclusions>
-		        <exclusion>
-		            <artifactId>spring-boot-starter-tomcat</artifactId>
-		            <groupId>org.springframework.boot</groupId>
-		        </exclusion>
-		    </exclusions>
-		</dependency>
-		
-		<!--引入其他的Servlet容器-->
-		<dependency>
-		    <artifactId>spring-boot-starter-jetty</artifactId>
-		    <groupId>org.springframework.boot</groupId>
-		</dependency>
+  ```java
+  <!-- 引入web模块 -->
+   <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <!-- 把默认的Tomcat排除 -->
+      <exclusions>
+          <exclusion>
+              <artifactId>spring-boot-starter-tomcat</artifactId>
+              <groupId>org.springframework.boot</groupId>
+          </exclusion>
+      </exclusions>
+  </dependency>
+  
+  <!--引入其他的Servlet容器-->
+  <dependency>
+      <artifactId>spring-boot-starter-jetty</artifactId>
+      <groupId>org.springframework.boot</groupId>
+  </dependency>
+  ```
 
 - **Undertow**
 
-		<!-- 引入web模块 -->
-		<dependency>
-		   <groupId>org.springframework.boot</groupId>
-		   <artifactId>spring-boot-starter-web</artifactId>
-		   <exclusions>
-		      <exclusion>
-		         <artifactId>spring-boot-starter-tomcat</artifactId>
-		         <groupId>org.springframework.boot</groupId>
-		      </exclusion>
-		   </exclusions>
-		</dependency>
-		
-		<!--引入其他的Servlet容器-->
-		<dependency>
-		   <artifactId>spring-boot-starter-undertow</artifactId>
-		   <groupId>org.springframework.boot</groupId>
-		</dependency>
+	```java
+	<!-- 引入web模块 -->
+	<dependency>
+	   <groupId>org.springframework.boot</groupId>
+	   <artifactId>spring-boot-starter-web</artifactId>
+	    <!-- 把默认的Tomcat排除 -->
+	   <exclusions>
+	      <exclusion>
+	         <artifactId>spring-boot-starter-tomcat</artifactId>
+	         <groupId>org.springframework.boot</groupId>
+	      </exclusion>
+	   </exclusions>
+	</dependency>
+	
+	<!--引入其他的Servlet容器-->
+	<dependency>
+	   <artifactId>spring-boot-starter-undertow</artifactId>
+	   <groupId>org.springframework.boot</groupId>
+	</dependency>
+	```
 
 
-#### 嵌入式Servlet容器自动配置原理 ####
+##### 嵌入式Servlet容器自动配置原理 #####
 
 **注意:2.0不再使用`EmbeddedServletContainerAutoConfiguration`,用的是`ServletWebServerFactoryAutoConfiguration`**
 
+- SpringBoot应用启动发现当前是Web应用。web场景包-导入tomcat
+- web应用会创建一个web版的ioc容器 ServletWebServerApplicationContext 
+- ServletWebServerApplicationContext  启动的时候寻找 ServletWebServerFactory（Servlet 的web服务器工厂---> Servlet 的web服务器）  
+- SpringBoot底层默认有很多的WebServer工厂；TomcatServletWebServerFactory, JettyServletWebServerFactory, or UndertowServletWebServerFactory
+- 底层直接会有一个自动配置类。ServletWebServerFactoryAutoConfiguration
+- ServletWebServerFactoryAutoConfiguration导入了ServletWebServerFactoryConfiguration（配置类）
+- ServletWebServerFactoryConfiguration 配置类 根据动态判断系统中到底导入了那个Web服务器的包。（默认是web-starter导入tomcat包），容器中就有 TomcatServletWebServerFactory
+- TomcatServletWebServerFactory 创建出Tomcat服务器并启动；TomcatWebServer 的构造器拥有初始化方法initialize---this.tomcat.start();
+- 内嵌服务器，就是手动把启动服务器的代码调用（tomcat核心jar包存在）
+
 **`ServletWebServerFactoryAutoConfiguration`：嵌入式的web服务器自动配置**
 
-	@Configuration(proxyBeanMethods = false)
-	@AutoConfigureOrder(Ordered.HIGHEST_PRECEDENCE)
-	@ConditionalOnClass(ServletRequest.class)
-	@ConditionalOnWebApplication(type = Type.SERVLET)
-	@EnableConfigurationProperties(ServerProperties.class)
-	@Import({ ServletWebServerFactoryAutoConfiguration.BeanPostProcessorsRegistrar.class,
-			ServletWebServerFactoryConfiguration.EmbeddedTomcat.class,
-			ServletWebServerFactoryConfiguration.EmbeddedJetty.class,
-			ServletWebServerFactoryConfiguration.EmbeddedUndertow.class })
-	//导入BeanPostProcessorsRegistrar：Spring注解版；给容器中导入一些组件
-	public class ServletWebServerFactoryAutoConfiguration {
-		.....
-	}
+```java
+@Configuration(proxyBeanMethods = false)
+@AutoConfigureOrder(Ordered.HIGHEST_PRECEDENCE)
+@ConditionalOnClass(ServletRequest.class)
+@ConditionalOnWebApplication(type = Type.SERVLET)
+@EnableConfigurationProperties(ServerProperties.class)
+@Import({ ServletWebServerFactoryAutoConfiguration.BeanPostProcessorsRegistrar.class,
+		ServletWebServerFactoryConfiguration.EmbeddedTomcat.class,
+		ServletWebServerFactoryConfiguration.EmbeddedJetty.class,
+		ServletWebServerFactoryConfiguration.EmbeddedUndertow.class })
+//导入BeanPostProcessorsRegistrar：Spring注解版；给容器中导入一些组件
+public class ServletWebServerFactoryAutoConfiguration {
+	.....
+}
+```
 
 **`EmbeddedTomcat.class`**
 
-	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnClass({ Servlet.class, Tomcat.class, UpgradeProtocol.class })//判断当前是否引入了Tomcat依赖
-	/**
-	判断当前容器没有用户自己定义ServletWebServerFactory：嵌入式的Servlet容器工厂；作用：创建嵌入式的Servlet容器
-	**/
-	@ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
-	static class EmbeddedTomcat {
-	
-		@Bean
-		TomcatServletWebServerFactory tomcatServletWebServerFactory(
-				ObjectProvider<TomcatConnectorCustomizer> connectorCustomizers,
-				ObjectProvider<TomcatContextCustomizer> contextCustomizers,
-				ObjectProvider<TomcatProtocolHandlerCustomizer<?>> protocolHandlerCustomizers) {
-			TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory();
-			factory.getTomcatConnectorCustomizers()
-					.addAll(connectorCustomizers.orderedStream().collect(Collectors.toList()));
-			factory.getTomcatContextCustomizers()
-					.addAll(contextCustomizers.orderedStream().collect(Collectors.toList()));
-			factory.getTomcatProtocolHandlerCustomizers()
-					.addAll(protocolHandlerCustomizers.orderedStream().collect(Collectors.toList()));
-			return factory;
-		}
-	
+```java
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnClass({ Servlet.class, Tomcat.class, UpgradeProtocol.class })//判断当前是否引入了Tomcat依赖
+/**
+判断当前容器没有用户自己定义ServletWebServerFactory：嵌入式的Servlet容器工厂；作用：创建嵌入式的Servlet容器
+**/
+@ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
+static class EmbeddedTomcat {
+
+	@Bean
+	TomcatServletWebServerFactory tomcatServletWebServerFactory(
+			ObjectProvider<TomcatConnectorCustomizer> connectorCustomizers,
+			ObjectProvider<TomcatContextCustomizer> contextCustomizers,
+			ObjectProvider<TomcatProtocolHandlerCustomizer<?>> protocolHandlerCustomizers) {
+		TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory();
+		factory.getTomcatConnectorCustomizers()
+				.addAll(connectorCustomizers.orderedStream().collect(Collectors.toList()));
+		factory.getTomcatContextCustomizers()
+				.addAll(contextCustomizers.orderedStream().collect(Collectors.toList()));
+		factory.getTomcatProtocolHandlerCustomizers()
+				.addAll(protocolHandlerCustomizers.orderedStream().collect(Collectors.toList()));
+		return factory;
 	}
+
+}
+```
 
 **`EmbeddedJetty`**
 
-	/**
-	 * Nested configuration if Jetty is being used.
-	 */
-	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnClass({ Servlet.class, Server.class, Loader.class, WebAppContext.class })
-	@ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
-	static class EmbeddedJetty {
-	
-		@Bean
-		JettyServletWebServerFactory JettyServletWebServerFactory(
-				ObjectProvider<JettyServerCustomizer> serverCustomizers) {
-			JettyServletWebServerFactory factory = new JettyServletWebServerFactory();
-			factory.getServerCustomizers().addAll(serverCustomizers.orderedStream().collect(Collectors.toList()));
-			return factory;
-		}
-	
+```java
+/**
+ * Nested configuration if Jetty is being used.
+ */
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnClass({ Servlet.class, Server.class, Loader.class, WebAppContext.class })	//判断是否有引入相关类,后台三个类是属于jetty包下的
+@ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
+static class EmbeddedJetty {
+
+	@Bean
+	JettyServletWebServerFactory JettyServletWebServerFactory(
+			ObjectProvider<JettyServerCustomizer> serverCustomizers) {
+		JettyServletWebServerFactory factory = new JettyServletWebServerFactory();
+		factory.getServerCustomizers().addAll(serverCustomizers.orderedStream().collect(Collectors.toList()));
+		return factory;
 	}
+
+}
+```
 
 **`EmbeddedUndertow`**
 
-	/**
-	 * Nested configuration if Undertow is being used.
-	 */
-	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnClass({ Servlet.class, Undertow.class, SslClientAuthMode.class })
-	@ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
-	static class EmbeddedUndertow {
-	
-		@Bean
-		UndertowServletWebServerFactory undertowServletWebServerFactory(
-				ObjectProvider<UndertowDeploymentInfoCustomizer> deploymentInfoCustomizers,
-				ObjectProvider<UndertowBuilderCustomizer> builderCustomizers) {
-			UndertowServletWebServerFactory factory = new UndertowServletWebServerFactory();
-			factory.getDeploymentInfoCustomizers()
-					.addAll(deploymentInfoCustomizers.orderedStream().collect(Collectors.toList()));
-			factory.getBuilderCustomizers().addAll(builderCustomizers.orderedStream().collect(Collectors.toList()));
-			return factory;
-		}
-	
+```java
+/**
+ * Nested configuration if Undertow is being used.
+ */
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnClass({ Servlet.class, Undertow.class, SslClientAuthMode.class })	//同理判断是否有引入相关类
+@ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
+static class EmbeddedUndertow {
+
+	@Bean
+	UndertowServletWebServerFactory undertowServletWebServerFactory(
+			ObjectProvider<UndertowDeploymentInfoCustomizer> deploymentInfoCustomizers,
+			ObjectProvider<UndertowBuilderCustomizer> builderCustomizers) {
+		UndertowServletWebServerFactory factory = new UndertowServletWebServerFactory();
+		factory.getDeploymentInfoCustomizers()
+				.addAll(deploymentInfoCustomizers.orderedStream().collect(Collectors.toList()));
+		factory.getBuilderCustomizers().addAll(builderCustomizers.orderedStream().collect(Collectors.toList()));
+		return factory;
 	}
+
+}
+```
 
 
 **`ServletWebServerFactory`：嵌入式的web服务器工厂**
 
-		public interface ServletWebServerFactory {
-		
-			//获取嵌入式的Servlet容器
-			WebServer getWebServer(ServletContextInitializer... initializers);
-		
-		}
+```java
+	public interface ServletWebServerFactory {
+	
+		//获取嵌入式的Servlet容器
+		WebServer getWebServer(ServletContextInitializer... initializers);
+	
+	}
+```
 
 其实现类
 
@@ -9082,100 +9588,254 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 
 以`TomcatServletWebServerFactory`为例
 
-	public WebServer getWebServer(ServletContextInitializer... initializers) {
-		if (this.disableMBeanRegistry) {
-			Registry.disableRegistry();
+```java
+//以此为入口研究servlet的启动原理
+public class ServletWebServerApplicationContext extends GenericWebApplicationContext{
+    ...
+    private void createWebServer() {
+        	//创建一个空的WEB服务器
+            WebServer webServer = this.webServer;
+            ServletContext servletContext = getServletContext();
+            if (webServer == null && servletContext == null) {
+                //创建WEB服务器,点击进入
+                //最终找到的是TomcatServletWebServerFactory,因为ServletWebServerFactoryConfiguration配置类里导入了其配置类
+                ServletWebServerFactory factory = getWebServerFactory();
+                //获取服务器,点击进入,如下
+                //这里的WebServer看接口
+                this.webServer = factory.getWebServer(getSelfInitializer());
+                getBeanFactory().registerSingleton("webServerGracefulShutdown",
+                        new WebServerGracefulShutdownLifecycle(this.webServer));
+                getBeanFactory().registerSingleton("webServerStartStop",
+                        new WebServerStartStopLifecycle(this, this.webServer));
+            }
+            else if (servletContext != null) {
+                try {
+                    getSelfInitializer().onStartup(servletContext);
+                }
+                catch (ServletException ex) {
+                    throw new ApplicationContextException("Cannot initialize servlet context", ex);
+                }
+            }
+            initPropertySources();
+        }
+    ...
+}
+
+=======================================
+    protected ServletWebServerFactory getWebServerFactory() {
+		// IOC容器找ServletWebServerFactory的组件,有可能返回多个
+		String[] beanNames = getBeanFactory().getBeanNamesForType(ServletWebServerFactory.class);
+    	//当为空的时候抛出异常
+		if (beanNames.length == 0) {
+			throw new ApplicationContextException("Unable to start ServletWebServerApplicationContext due to missing "
+					+ "ServletWebServerFactory bean.");
 		}
-		//创建一个Tomcat
-		Tomcat tomcat = new Tomcat();
-		//配置Tomcat的基本环境，（tomcat的配置都是从本类获取的，tomcat.setXXX）
-		File baseDir = (this.baseDirectory != null) ? this.baseDirectory : createTempDir("tomcat");
-		tomcat.setBaseDir(baseDir.getAbsolutePath());
-		Connector connector = new Connector(this.protocol);
-		connector.setThrowOnFailure(true);
-		tomcat.getService().addConnector(connector);
-		customizeConnector(connector);
-		tomcat.setConnector(connector);
-		tomcat.getHost().setAutoDeploy(false);
-		configureEngine(tomcat.getEngine());
-		for (Connector additionalConnector : this.additionalTomcatConnectors) {
-			tomcat.getService().addConnector(additionalConnector);
+    	//当多于一个的时候也会抛异常
+		if (beanNames.length > 1) {
+			throw new ApplicationContextException("Unable to start ServletWebServerApplicationContext due to multiple "
+					+ "ServletWebServerFactory beans : " + StringUtils.arrayToCommaDelimitedString(beanNames));
 		}
-		prepareContext(tomcat.getHost(), initializers);
-		//将配置好的Tomcat传入进去，返回一个WebServer；并且启动Tomcat服务器
-		return getTomcatWebServer(tomcat);
+    	//最终只会找到一个,就是ServletWebServerFactory
+		return getBeanFactory().getBean(beanNames[0], ServletWebServerFactory.class);
 	}
+```
+
+```java
+//TomcatServletWebServerFactory
+public WebServer getWebServer(ServletContextInitializer... initializers) {
+	if (this.disableMBeanRegistry) {
+		Registry.disableRegistry();
+	}
+	//创建一个内嵌的Tomcat
+	Tomcat tomcat = new Tomcat();
+	//配置Tomcat的基本环境，（tomcat的配置都是从本类获取的，tomcat.setXXX）
+	File baseDir = (this.baseDirectory != null) ? this.baseDirectory : createTempDir("tomcat");
+	tomcat.setBaseDir(baseDir.getAbsolutePath());
+	Connector connector = new Connector(this.protocol);
+	connector.setThrowOnFailure(true);
+	tomcat.getService().addConnector(connector);
+	customizeConnector(connector);
+	tomcat.setConnector(connector);
+	tomcat.getHost().setAutoDeploy(false);
+	configureEngine(tomcat.getEngine());
+	for (Connector additionalConnector : this.additionalTomcatConnectors) {
+		tomcat.getService().addConnector(additionalConnector);
+	}
+	prepareContext(tomcat.getHost(), initializers);
+	//将配置好的Tomcat传入进去，返回一个WebServer；并且启动Tomcat服务器
+	return getTomcatWebServer(tomcat);
+}
+```
+
+```java
+//接口定义了一个start接口
+public interface WebServer {
+    //进入TomcatServletWebServerFactory看其实现是如何启动
+    void start() throws WebServerException;
+}
+```
+
+```java
+	public class TomcatWebServer implements WebServer {
+        //构造器初始化方法
+        public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
+            Assert.notNull(tomcat, "Tomcat Server must not be null");
+            this.tomcat = tomcat;
+            this.autoStart = autoStart;
+            this.gracefulShutdown = (shutdown == Shutdown.GRACEFUL) ? new GracefulShutdown(tomcat) : null;
+            initialize();	//初始化方法里启动了tomcat.start()
+        }
+        ...
+	}
+```
+
+##### 定制Servlet容器
+
+- 实现  **WebServerFactoryCustomizer<ConfigurableServletWebServerFactory> **
+
+- - 把配置文件的值和**`ServletWebServerFactory 进行绑定`**
+
+- ```java
+  //配置类
+  public class ServletWebServerFactoryCustomizer
+  		implements WebServerFactoryCustomizer<ConfigurableServletWebServerFactory>, Ordered {
+  
+  	private final ServerProperties serverProperties;
+  
+  	public ServletWebServerFactoryCustomizer(ServerProperties serverProperties) {
+  		this.serverProperties = serverProperties;
+  	}
+  
+  	@Override
+  	public int getOrder() {
+  		return 0;
+  	}
+  
+  	@Override
+  	public void customize(ConfigurableServletWebServerFactory factory) {
+  		PropertyMapper map = PropertyMapper.get().alwaysApplyingWhenNonNull();
+  		map.from(this.serverProperties::getPort).to(factory::setPort);
+  		map.from(this.serverProperties::getAddress).to(factory::setAddress);
+  		map.from(this.serverProperties.getServlet()::getContextPath).to(factory::setContextPath);
+  		map.from(this.serverProperties.getServlet()::getApplicationDisplayName).to(factory::setDisplayName);
+  		map.from(this.serverProperties.getServlet()::isRegisterDefaultServlet).to(factory::setRegisterDefaultServlet);
+  		map.from(this.serverProperties.getServlet()::getSession).to(factory::setSession);
+  		map.from(this.serverProperties::getSsl).to(factory::setSsl);
+  		map.from(this.serverProperties.getServlet()::getJsp).to(factory::setJsp);
+  		map.from(this.serverProperties::getCompression).to(factory::setCompression);
+  		map.from(this.serverProperties::getHttp2).to(factory::setHttp2);
+  		map.from(this.serverProperties::getServerHeader).to(factory::setServerHeader);
+  		map.from(this.serverProperties.getServlet()::getContextParameters).to(factory::setInitParameters);
+  		map.from(this.serverProperties.getShutdown()).to(factory::setShutdown);
+  	}
+  
+  }
+  ```
+
+- 
+
+- 修改配置文件 **server.xxx**
+
+  ```java
+  通过上面源码发现,配置加载都是通过`ServerProperties`类进行加载
+  public class ServerProperties {
+      ...
+  }
+  ```
+
+  
+
+- 直接自定义 **ConfigurableServletWebServerFactory**
+
+  ```java
+  //sprinbot示例
+  @Bean
+  public ConfigurableServletWebServerFactory webServerFactory() {
+      TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory();
+      factory.setPort(9000);
+      factory.setSessionTimeout(10, TimeUnit.MINUTES);
+      factory.addErrorPages(new ErrorPage(HttpStatus.NOT_FOUND, "/notfound.html"));
+      return factory;
+  }
+  ```
 
 
-	protected TomcatWebServer getTomcatWebServer(Tomcat tomcat) {
-		//初始化Tomcat服务器,当端口号大于0时自动启 动
-		return new TomcatWebServer(tomcat, getPort() >= 0);
-	}
+
+```java
+protected TomcatWebServer getTomcatWebServer(Tomcat tomcat) {
+	//初始化Tomcat服务器,当端口号大于0时自动启 动
+	return new TomcatWebServer(tomcat, getPort() >= 0);
+}
+```
 
 **对嵌入式容器的配置修改是怎么生效的?**
 
-#### 配置修改原理 ####
+##### 配置修改原理 #####
 
 1. 使用配置类修改配置为何生效
 
-	`ServletWebServerFactoryAutoConfiguration`在向容器中添加web容器时还添加了一个组件
-	
-	![](http://120.77.237.175:9080/photos/springboot/57.jpg)
-	
-	`BeanPostProcessorsRegistrar`：后置处理器注册器(也是给容器注入一些组件,可以看到下图注册了两个组件)
-	
-	![](http://120.77.237.175:9080/photos/springboot/58.jpg)
-	
-	**`WebServerFactoryCustomizerBeanPostProcessor`**
-	
-		public class WebServerFactoryCustomizerBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware {
-		
-			....
-			 //在Bean初始化之前
-			@Override
-			public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
-				if (bean instanceof WebServerFactory) {
-					postProcessBeforeInitialization((WebServerFactory) bean);
-				}
-				return bean;
-			}
-		
-			@Override
-			public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-				return bean;
-			}
-		
-			@SuppressWarnings("unchecked")
-			private void postProcessBeforeInitialization(WebServerFactory webServerFactory) {
-				//获取所有的定制器，调用每一个定制器的customize方法来给Servlet容器进行属性赋值；
-				LambdaSafe.callbacks(WebServerFactoryCustomizer.class, getCustomizers(), webServerFactory)
-						.withLogger(WebServerFactoryCustomizerBeanPostProcessor.class)
-						.invoke((customizer) -> customizer.customize(webServerFactory));
-			}
-				...
-		}
+  `ServletWebServerFactoryAutoConfiguration`在向容器中添加web容器时还添加了一个组件
+
+  ![](http://120.77.237.175:9080/photos/springboot/57.jpg)
+
+  `BeanPostProcessorsRegistrar`：后置处理器注册器(也是给容器注入一些组件,可以看到下图注册了两个组件)
+
+  ![](http://120.77.237.175:9080/photos/springboot/58.jpg)
+
+  **`WebServerFactoryCustomizerBeanPostProcessor`**
+
+  ```java
+  public class WebServerFactoryCustomizerBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware {
+  
+  	....
+  	 //在Bean初始化之前
+  	@Override
+  	public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+  		if (bean instanceof WebServerFactory) {
+  			postProcessBeforeInitialization((WebServerFactory) bean);
+  		}
+  		return bean;
+  	}
+  
+  	@Override
+  	public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+  		return bean;
+  	}
+  
+  	@SuppressWarnings("unchecked")
+  	private void postProcessBeforeInitialization(WebServerFactory webServerFactory) {
+  		//获取所有的定制器，调用每一个定制器的customize方法来给Servlet容器进行属性赋值；
+  		LambdaSafe.callbacks(WebServerFactoryCustomizer.class, getCustomizers(), webServerFactory)
+  				.withLogger(WebServerFactoryCustomizerBeanPostProcessor.class)
+  				.invoke((customizer) -> customizer.customize(webServerFactory));
+  	}
+  		...
+  }
+  ```
 
 2. 使用配置文件为何生效
 
 	**`EmbeddedWebServerFactoryCustomizerAutoConfiguration`**
 	
-		@Configuration(proxyBeanMethods = false)
-		@ConditionalOnWebApplication
-		//把配置文件类注入进来
-		@EnableConfigurationProperties(ServerProperties.class)
-		public class EmbeddedWebServerFactoryCustomizerAutoConfiguration {
-		
-		@Configuration(proxyBeanMethods = false)
-		@ConditionalOnClass({ Tomcat.class, UpgradeProtocol.class })
-		public static class TomcatWebServerFactoryCustomizerConfiguration {
-		
-			@Bean
-			public TomcatWebServerFactoryCustomizer tomcatWebServerFactoryCustomizer(Environment environment,
-					ServerProperties serverProperties) {
-				return new TomcatWebServerFactoryCustomizer(environment, serverProperties);
-			}
-		
+	```java
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnWebApplication
+	//把配置文件类注入进来
+	@EnableConfigurationProperties(ServerProperties.class)
+	public class EmbeddedWebServerFactoryCustomizerAutoConfiguration {
+	
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass({ Tomcat.class, UpgradeProtocol.class })
+	public static class TomcatWebServerFactoryCustomizerConfiguration {
+	
+		@Bean
+		public TomcatWebServerFactoryCustomizer tomcatWebServerFactoryCustomizer(Environment environment,
+				ServerProperties serverProperties) {
+			return new TomcatWebServerFactoryCustomizer(environment, serverProperties);
 		}
+	
+	}
+	```
 
 
 **总结**：
@@ -9184,7 +9844,7 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 2. 容器中某个组件要创建对象就会惊动后置处理器 `webServerFactoryCustomizerBeanPostProcessor`只要是嵌入式的是Servlet容器工厂，后置处理器就会工作；
 3. 后置处理器，从容器中获取所有的WebServerFactoryCustomizer，调用定制器的定制方法给工厂添加配置
 
-#### 嵌入式Servlet容器启动原理 ####
+##### 嵌入式Servlet容器启动原理 #####
 
 什么时候创建嵌入式的Servlet容器工厂？什么时候获取嵌入式的Servlet容器并启动Tomcat
 
@@ -9225,7 +9885,7 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 8. 嵌入式的Servlet容器创建对象并启动Servlet容器；
 9. 嵌入式的Servlet容器启动后，再将ioc容器中剩下没有创建出的对象获取出来(Controller,Service等)；
 
-#### 使用外置的Servlet容器 ####
+##### 使用外置的Servlet容器 #####
 
 嵌入式Servlet容器：应用打成可执行的jar
 
@@ -9235,6 +9895,7 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 外置的Servlet容器：外面安装Tomcat---应用war包的方式打包
 
 1. 必须创建一个war项目
+
 2. 编写一个类继承`SpringBootServletInitializer`，并重写`configure`方法，调用参数的sources方法springboot启动类传过去然后返回
 
 	public class ServletInitializer extends SpringBootServletInitializer {
@@ -9248,11 +9909,17 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 
 3. 把tomcat的依赖范围改为provided
 
-		 <dependency>
+		```java
+	 <dependency>
 	            <groupId>org.springframework.boot</groupId>
 	            <artifactId>spring-boot-starter-tomcat</artifactId>
 	            <scope>provided</scope>
 	    </dependency>
+	```
+	
+	
+	```
+	
 4. project setting,可以看到当前项目下生成了`web.xml`
 
 	![](http://120.77.237.175:9080/photos/springboot/63.jpg)
@@ -9267,7 +9934,7 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 
 ![](http://120.77.237.175:9080/photos/springboot/65.jpg)
 
-#### 原理 ####
+##### 原理 #####
 
 - jar包：执行SpringBoot主类的main方法，启动ioc容器，创建嵌入式的Servlet容器
 - war包：启动服务器，**服务器启动SpringBoot应用**【SpringBootServletInitializer】，启动ioc容器；
@@ -9337,120 +10004,300 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 		}
 7. Spring的应用就启动并且创建IOC容器
 
-		public ConfigurableApplicationContext run(String... args) {
-			StopWatch stopWatch = new StopWatch();
-			stopWatch.start();
-			ConfigurableApplicationContext context = null;
-			Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
-			configureHeadlessProperty();
-			SpringApplicationRunListeners listeners = getRunListeners(args);
-			listeners.starting();
-			try {
-				ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
-				ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
-				configureIgnoreBeanInfo(environment);
-				Banner printedBanner = printBanner(environment);
-				context = createApplicationContext();
-				exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
-						new Class[] { ConfigurableApplicationContext.class }, context);
-				prepareContext(context, environment, listeners, applicationArguments, printedBanner);
-				//刷新IOC容器
-				refreshContext(context);
-				afterRefresh(context, applicationArguments);
-				stopWatch.stop();
-				if (this.logStartupInfo) {
-					new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
-				}
-				listeners.started(context);
-				callRunners(context, applicationArguments);
+	```java
+	public ConfigurableApplicationContext run(String... args) {
+		StopWatch stopWatch = new StopWatch();
+		stopWatch.start();
+		ConfigurableApplicationContext context = null;
+		Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
+		configureHeadlessProperty();
+		SpringApplicationRunListeners listeners = getRunListeners(args);
+		listeners.starting();
+		try {
+			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+			ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
+			configureIgnoreBeanInfo(environment);
+			Banner printedBanner = printBanner(environment);
+			context = createApplicationContext();
+			exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
+					new Class[] { ConfigurableApplicationContext.class }, context);
+			prepareContext(context, environment, listeners, applicationArguments, printedBanner);
+			//刷新IOC容器
+			refreshContext(context);
+			afterRefresh(context, applicationArguments);
+			stopWatch.stop();
+			if (this.logStartupInfo) {
+				new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
 			}
-			catch (Throwable ex) {
-				handleRunFailure(context, ex, exceptionReporters, listeners);
-				throw new IllegalStateException(ex);
-			}
-		
-			try {
-				listeners.running(context);
-			}
-			catch (Throwable ex) {
-				handleRunFailure(context, ex, exceptionReporters, null);
-				throw new IllegalStateException(ex);
-			}
-			return context;
+			listeners.started(context);
+			callRunners(context, applicationArguments);
 		}
+		catch (Throwable ex) {
+			handleRunFailure(context, ex, exceptionReporters, listeners);
+			throw new IllegalStateException(ex);
+		}
+	
+		try {
+			listeners.running(context);
+		}
+		catch (Throwable ex) {
+			handleRunFailure(context, ex, exceptionReporters, null);
+			throw new IllegalStateException(ex);
+		}
+		return context;
+	}
+	```
 
+#### 定制化原理
+
+##### 定制化的常见方式
+
+- 修改配置文件；
+
+- **xxxxxCustomizer；**
+
+- **编写自定义的配置类  xxxConfiguration；+** **@Bean替换、增加容器中默认组件；视图解析器** 
+
+- **Web应用 编写一个配置类实现 WebMvcConfigurer 即可定制化web功能；+ @Bean给容器中再扩展一些组件(日常开发常用这个配置定制化)**
+
+```java
+@Configuration
+public class AdminWebConfig implements WebMvcConfigurer
+```
+
+- **@EnableWebMvc + WebMvcConfigurer —— @Bean  可以全面接管SpringMVC，所有规则全部自己重新配置(慎用)； 实现定制和扩展功能**
+
+  - 为什么开启了`@EnableWebMvc`会全面覆盖所有SpirngMVC的原生配置,其原理如下
+
+  - 1. WebMvcAutoConfiguration  默认的SpringMVC的自动配置功能类。静态资源、欢迎页.....
+
+  - 2. 一旦使用 `@EnableWebMvc` 会 `@Import(DelegatingWebMvcConfiguration.**class**)`
+
+  - 3. **DelegatingWebMvcConfiguration** 的 作用，只保证SpringMVC最基本的使用
+
+  - - - 把所有系统中的 WebMvcConfigurer 拿过来。所有功能的定制都是这些 WebMvcConfigurer  合起来一起生效
+      - 自动配置了一些非常底层的组件。**RequestMappingHandlerMapping**、这些组件依赖的组件都是从容器中获取
+      - `public class DelegatingWebMvcConfiguration extends WebMvcConfigurationSupport`
+
+  - 4. `WebMvcAutoConfiguration `里面的配置要能生效 必须  @ConditionalOnMissingBean(**WebMvcConfigurationSupport**.**class**)
+
+  - 5. @EnableWebMvc  导致了 **WebMvcAutoConfiguration  没有生效**
+
+  - ```java
+    //点击DelegatingWebMvcConfiguration进入
+    @Import(DelegatingWebMvcConfiguration.class)
+    public @interface EnableWebMvc {
+    }
+    =========================================
+        @Configuration(proxyBeanMethods = false)
+        //点击进WebMvcConfigurationSupport也可以看到其也配置了一些非常底层的组件
+    public class DelegatingWebMvcConfiguration extends WebMvcConfigurationSupport {
+    
+    	private final WebMvcConfigurerComposite configurers = new WebMvcConfigurerComposite();
+    
+    	//其方法设置了一堆configurers
+    	@Autowired(required = false)
+    	public void setConfigurers(List<WebMvcConfigurer> configurers) {
+    		if (!CollectionUtils.isEmpty(configurers)) {
+    			this.configurers.addWebMvcConfigurers(configurers);
+    		}
+    	}
+     	.............   
+    }
+    ```
+
+  - ```java
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnWebApplication(type = Type.SERVLET)
+    @ConditionalOnClass({ Servlet.class, DispatcherServlet.class, WebMvcConfigurer.class })
+    //这里定义了当WebMvcConfigurationSupport没有的时候就会生效,因此为什么当上面开启@EnableWebMvc,其导致了WebMvcAutoConfiguration没有生效
+    @ConditionalOnMissingBean(WebMvcConfigurationSupport.class)
+    @AutoConfigureOrder(Ordered.HIGHEST_PRECEDENCE + 10)
+    @AutoConfigureAfter({ DispatcherServletAutoConfiguration.class, TaskExecutionAutoConfiguration.class,
+    		ValidationAutoConfiguration.class })
+    public class WebMvcAutoConfiguration {
+    	...
+    }
+    ```
+
+  - 
+
+##### 原理分析套路
+
+**场景starter** **- xxxxAutoConfiguration - 导入xxx组件 - 绑定xxxProperties --** **绑定配置文件项**
 
 # SpringBoot与数据访问 #
 
-## JDBC ##
+## SQL ##
 
 **依赖**
 		
-   	<dependency>
-   	    <groupId>org.springframework.boot</groupId>
-   	    <artifactId>spring-boot-starter-jdbc</artifactId>
-   	</dependency>
-   	 <dependency>
-   	        <groupId>mysql</groupId>
-   	        <artifactId>mysql-connector-java</artifactId>
-   	        <scope>runtime</scope>
-   	</dependency>
+```java
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+    <!--springboot底层已经有版本仲裁,无需写版本号-->
+ <dependency>
+        <groupId>mysql</groupId>
+        <artifactId>mysql-connector-java</artifactId>
+        <scope>runtime</scope>
+</dependency>
+```
+
+```
+默认版本：<mysql.version>8.0.22</mysql.version>
+
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+<!--            <version>5.1.49</version>-->
+        </dependency>
+想要修改版本
+1、直接依赖引入具体版本（maven的就近依赖原则）
+2、重新声明版本（maven的属性的就近优先原则）
+    <properties>
+        <java.version>1.8</java.version>
+        <mysql.version>5.1.49</mysql.version>
+    </properties>
+```
+
+![](http://120.77.237.175:9080/photos/springboot/125.png)
+
+数据库驱动？
+
+为什么导入JDBC场景，官方不导入驱动？**官方不知道我们接下要操作什么数据库**。
+
+数据库版本和驱动版本对应
 
 **配置**
 
-	spring:
-	  datasource:
-	    username: root
-	    password: 123456
-	    url: jdbc:mysql://120.77.237.175:9306/springboot?serverTimezone=Asia/Shanghai
-	    driver-class-name: com.mysql.cj.jdbc.Driver
+```java
+spring:
+  datasource:
+    username: xxxxx
+    password: xxxxx
+    url: jdbc:mysql://xxx.xxx.xxx.xxx:xxx/springboot?serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+```
 
 
 **测试**
 
-	@SpringBootTest
-	class SpringbootDataJdbcApplicationTests {
-	
-	    @Autowired
-	    DataSource dataSource;
-	
-	    @Test
-	    void contextLoads() throws SQLException {
-	        System.out.println(dataSource.getClass());	//class com.zaxxer.hikari.HikariDataSource
-	
-	        System.out.println(dataSource.getConnection());	//HikariProxyConnection@1507604180 wrapping com.mysql.cj.jdbc.ConnectionImpl@12fcc71f
-	    }
-	
-	}
+```java
+@SpringBootTest
+class SpringbootDataJdbcApplicationTests {
 
+    @Autowired
+    DataSource dataSource;
 
-`springboot`2.0以上默认是使用**`com.zaxxer.hikari.HikariDataSource`**作为数据源，2.0以下是用**`org.apache.tomcat.jdbc.pool.DataSource`**作为数据源；
+    @Test
+    void contextLoads() throws SQLException {
+        System.out.println(dataSource.getClass());	//class com.zaxxer.hikari.HikariDataSource
+
+        System.out.println(dataSource.getConnection());	//HikariProxyConnection@1507604180 wrapping com.mysql.cj.jdbc.ConnectionImpl@12fcc71f
+    }
+
+}
+```
+
+> `springboot`2.0以上默认是使用**`com.zaxxer.hikari.HikariDataSource`**作为数据源，2.0以下是用**`org.apache.tomcat.jdbc.pool.DataSource`**作为数据源；
 
 数据源的相关配置都在DataSourceProperties里面
 
 ## 自动配置原理 ##
 
+### 自动配置的类
+
+- `DataSourceAutoConfiguration` ： 数据源的自动配置
+
+- - 修改数据源相关的配置：**spring.datasource**
+  - **数据库连接池的配置，是自己容器中没有DataSource才自动配置的**
+  - 底层配置好的连接池是：**HikariDataSource**
+
+- `DataSourceTransactionManagerAutoConfiguration`： 事务管理器的自动配置
+- `JdbcTemplateAutoConfiguration`： **JdbcTemplate的自动配置，可以来对数据库进行crud**
+
+- - 可以修改这个配置项@ConfigurationProperties(prefix = **"spring.jdbc"**) 来修改JdbcTemplate
+  - `@Bean@Primary   JdbcTemplate`；容器中有这个组件
+
+- ```java
+  @Configuration(proxyBeanMethods = false)
+  @ConditionalOnMissingBean(JdbcOperations.class)
+  class JdbcTemplateConfiguration {
+  
+      /**DataSource可操作的数据源**/
+  	@Bean
+  	@Primary
+  	JdbcTemplate jdbcTemplate(DataSource dataSource, JdbcProperties properties) {
+  		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+  		JdbcProperties.Template template = properties.getTemplate();
+  		jdbcTemplate.setFetchSize(template.getFetchSize());
+  		jdbcTemplate.setMaxRows(template.getMaxRows());
+          //配置查询超时时间,单位为:秒,可在配置里定义
+  		if (template.getQueryTimeout() != null) {
+  			jdbcTemplate.setQueryTimeout((int) template.getQueryTimeout().getSeconds());
+  		}
+  		return jdbcTemplate;
+  	}
+  
+  }
+  ```
+
+- 
+
+- `JndiDataSourceAutoConfiguration`： jndi的自动配置
+- `XADataSourceAutoConfiguration`： 分布式事务相关的
+
 `jdbc`的相关配置都在**`org.springframework.boot.autoconfigure.jdbc`**包下
 
 1. 参考**`DataSourceConfiguration`**，根据配置创建数据源，默认使用`Hikari`连接池；可以使用`spring.datasource.type`指定自定义的数据源类型；
+
+   ```java
+   @Configuration(proxyBeanMethods = false)
+   @ConditionalOnClass({ DataSource.class, EmbeddedDatabaseType.class })
+   //io.r2dbc.spi.ConnectionFactory是基于响应式编程的,当没有配置此类时可以使用DataSource
+   @ConditionalOnMissingBean(type = "io.r2dbc.spi.ConnectionFactory")
+   //所有的可配置的选 项都是在DataSourceProperties这里定义了
+   @EnableConfigurationProperties(DataSourceProperties.class)
+   @Import({ DataSourcePoolMetadataProvidersConfiguration.class, DataSourceInitializationConfiguration.class })
+   public class DataSourceAutoConfiguration {
+   	...
+        @Configuration(proxyBeanMethods = false)
+   	@Conditional(PooledDataSourceCondition.class)
+        //当DataSource没有配置的时候,导入以下的数据库链接池,部份的数屈打成招源因依赖没导入不生效,只对DataSourceConfiguration.Hikari.class生效,默认数据源, 进入DataSourceConfiguration可看到配置的数据源,和创建初始化
+   	@ConditionalOnMissingBean({ DataSource.class, XADataSource.class })
+   	@Import({ DataSourceConfiguration.Hikari.class, DataSourceConfiguration.Tomcat.class,
+   			DataSourceConfiguration.Dbcp2.class, DataSourceConfiguration.Generic.class,
+   			DataSourceJmxConfiguration.class })
+   	protected static class PooledDataSourceConfiguration {
+   
+   	}
+       ...
+   }
+   ```
+
+   
+
 2. springboot默认支持的连池
-	- org.apache.tomcat.jdbc.pool.DataSource
-	- com.zaxxer.hikari.HikariDataSource
-	- org.apache.commons.dbcp2.BasicDataSource
+  - `org.apache.tomcat.jdbc.pool.DataSource`
+  - `com.zaxxer.hikari.HikariDataSource`
+  - `org.apache.commons.dbcp2.BasicDataSource`
+
 3. 自定义数据源类型
 
-		@Configuration(proxyBeanMethods = false)
-		@ConditionalOnMissingBean(DataSource.class)
-		@ConditionalOnProperty(name = "spring.datasource.type")
-		static class Generic {
-		
-			@Bean
-			DataSource dataSource(DataSourceProperties properties) {
-				//使用DataSourceBuilder创建数据源，利用反射创建响应type的数据源，并且绑定相关属性
-				return properties.initializeDataSourceBuilder().build();
-			}
-		
-		}
+   	@Configuration(proxyBeanMethods = false)
+   	@ConditionalOnMissingBean(DataSource.class)
+   	@ConditionalOnProperty(name = "spring.datasource.type")
+   	static class Generic {
+   	
+   		@Bean
+   		DataSource dataSource(DataSourceProperties properties) {
+   			//使用DataSourceBuilder创建数据源，利用反射创建响应type的数据源，并且绑定相关属性
+   			return properties.initializeDataSourceBuilder().build();
+   		}
+   	
+   	}
 
 ## 启动应用执行sql ##
 
@@ -9461,31 +10308,35 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 **`org.springframework.boot.autoconfigure.jdbc.DataSourceInitializer`**
 下面是获取schema脚本文件的方法
 
-	void initSchema() {
-		List<Resource> scripts = getScripts("spring.datasource.data", this.properties.getData(), "data");
-		if (!scripts.isEmpty()) {
-			if (!isEnabled()) {
-				logger.debug("Initialization disabled (not running data scripts)");
-				return;
-			}
-			String username = this.properties.getDataUsername();
-			String password = this.properties.getDataPassword();
-			runScripts(scripts, username, password);
+```java
+void initSchema() {
+	List<Resource> scripts = getScripts("spring.datasource.data", this.properties.getData(), "data");
+	if (!scripts.isEmpty()) {
+		if (!isEnabled()) {
+			logger.debug("Initialization disabled (not running data scripts)");
+			return;
 		}
+		String username = this.properties.getDataUsername();
+		String password = this.properties.getDataPassword();
+		runScripts(scripts, username, password);
 	}
+}
+```
 
 ----
 
-	private List<Resource> getScripts(String propertyName, List<String> resources, String fallback) {
-		if (resources != null) {
-			return getResources(propertyName, resources, true);
-		}
-		String platform = this.properties.getPlatform();
-		List<String> fallbackResources = new ArrayList<>();
-		fallbackResources.add("classpath*:" + fallback + "-" + platform + ".sql");
-		fallbackResources.add("classpath*:" + fallback + ".sql");
-		return getResources(propertyName, fallbackResources, false);
+```java
+private List<Resource> getScripts(String propertyName, List<String> resources, String fallback) {
+	if (resources != null) {
+		return getResources(propertyName, resources, true);
 	}
+	String platform = this.properties.getPlatform();
+	List<String> fallbackResources = new ArrayList<>();
+	fallbackResources.add("classpath*:" + fallback + "-" + platform + ".sql");
+	fallbackResources.add("classpath*:" + fallback + ".sql");
+	return getResources(propertyName, fallbackResources, false);
+}
+```
 
 
 可以看出，如果我们没有在配置文件中配置脚本的具体位置，就会在`classpath`下找`schema-all.sql`和`schema.sql platform`获取的是`all`，`platform`可以在配置文件中修改
@@ -9989,7 +10840,7 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 		    }
 		}
 
-# 启动配置原理 #
+# SpringBoot原理 #
 
 ![](http://120.77.237.175:9080/photos/springboot/72.png)
 
@@ -10007,381 +10858,950 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 
 ## 启动流程 ##
 
-	 public static void main(String[] args) {
-		//xxx.class：主配置类，（可以传多个）
-	    SpringApplication.run(SpringbootStarterApplication.class, args);
-	}
+### 创建 SpringApplication
+
+```java
+ public static void main(String[] args) {
+	//xxx.class：主配置类，（可以传多个）
+    SpringApplication.run(SpringbootStarterApplication.class, args);	//点击进入
+}
+```
 
 1. 从`run`方法开始，创建**`SpringApplication`**，然后再调用`run`方法
 
-		/**(可配置的应用程序上下文)**/
-		public static ConfigurableApplicationContext run(Class<?> primarySource, String... args) {
-			//调用下面的run方法
-		    return run(new Class[]{primarySource}, args);
-		}
-		
-		public static ConfigurableApplicationContext run(Class<?>[] primarySources, String[] args) {
-		    return (new SpringApplication(primarySources)).run(args);
-		}
+   ```java
+   /**(可配置的应用程序上下文)**/
+   public static ConfigurableApplicationContext run(Class<?> primarySource, String... args) {
+   	//调用下面的run方法,继续进入
+       return run(new Class[]{primarySource}, args);
+   }
+   --------------------------------------------------
+   public static ConfigurableApplicationContext run(Class<?>[] primarySources, String[] args) {
+       //继续进入SpringApplication初始化方法,run()方法在后在下一节介绍
+       return (new SpringApplication(primarySources)).run(args);
+   }
+   ```
 
 2. 创建**`SpringApplication`**
 
-		public SpringApplication(Class<?>... primarySources) {
-			this(null, primarySources);
-		}
-	
+	```java
+	public SpringApplication(Class<?>... primarySources) {
+		this(null, primarySources);
+	}
+	```
+```java
 
-		@SuppressWarnings({ "unchecked", "rawtypes" })
-		public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
-			this.resourceLoader = resourceLoader;
-			Assert.notNull(primarySources, "PrimarySources must not be null");
-			 //保存主配置类
-			this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
-			 //获取当前应用的类型，是不是web应用，见2.1
-			this.webApplicationType = WebApplicationType.deduceFromClasspath();
-			//从类路径下找到META‐INF/spring.factories配置的所有ApplicationContextInitializer；然后保存起来,见2.2
-			setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
-			//从类路径下找到META‐INF/spring.ApplicationListener；然后保存起来,原理同上
-			setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
-			 //从多个配置类中找到有main方法的主配置类，见下图(在调run方法的时候是可以传递多个配置类的)
-			this.mainApplicationClass = deduceMainApplicationClass();
-			//执行完毕，SpringApplication对象就创建出来了，返回到1处，调用SpringApplication对象的run方法,到3
-		}
-	2.1 判断是不是web 应用
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
+		this.resourceLoader = resourceLoader;
+	    //断言,如没有主配置类抛异常
+		Assert.notNull(primarySources, "PrimarySources must not be null");
+		 //保存主配置类
+		this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
+		 //获取当前应用的类型，是不是web应用，见2.1
+		this.webApplicationType = WebApplicationType.deduceFromClasspath();
+	    //获取初始启动引导器,点击getSpringFactoriesInstances进入见2.3,当前没配置,获取到的为0
+	    this.bootstrappers = new ArrayList<>(getSpringFactoriesInstances(Bootstrapper.class));
+		//初始化器,从类路径下找到META‐INF/spring.factories配置的所有ApplicationContextInitializer；然后保存起来,见2.2
+        //注意:只要在SpringBoot有getSpringFactoriesInstances之类的方法,都一定是去spring.factories找指定的组件
+        //总共找到了7个,在2.2.2图
+		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+		//应用监听器,从类路径下找到META‐INF/spring.ApplicationListener；然后保存起来,原理同上
+        //总共找到了9个监听器,2.4
+		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
+		 //从多个配置类中找到有main方法的主配置类，点击进入,可见下图(在调run方法的时候是可以传递多个配置类的)
+		this.mainApplicationClass = deduceMainApplicationClass();
+		//执行完毕，SpringApplication对象就创建出来了，返回到1处，调用SpringApplication对象的run方法,到3
+	}
 
-		static WebApplicationType deduceFromClasspath() {
-			if (ClassUtils.isPresent(WEBFLUX_INDICATOR_CLASS, null) && !ClassUtils.isPresent(WEBMVC_INDICATOR_CLASS, null)
-					&& !ClassUtils.isPresent(JERSEY_INDICATOR_CLASS, null)) {
-				return WebApplicationType.REACTIVE;
-			}
-			for (String className : SERVLET_INDICATOR_CLASSES) {
-				if (!ClassUtils.isPresent(className, null)) {
-					return WebApplicationType.NONE;
+========================================
+    //找到第一个有main方法就直接返回
+    private Class<?> deduceMainApplicationClass() {
+		try {
+			StackTraceElement[] stackTrace = new RuntimeException().getStackTrace();
+			for (StackTraceElement stackTraceElement : stackTrace) {
+				if ("main".equals(stackTraceElement.getMethodName())) {
+					return Class.forName(stackTraceElement.getClassName());
 				}
 			}
-			return WebApplicationType.SERVLET;
 		}
-
-	2.2 `getSpringFactoriesInstances(ApplicationContextInitializer.class))`
-		
-		private <T> Collection<T> getSpringFactoriesInstances(Class<T> type) {
-			 //调用下面重载方法，type：ApplicationContextInitializer.class
-			return getSpringFactoriesInstances(type, new Class<?>[] {});
+		catch (ClassNotFoundException ex) {
+			// Swallow and continue
 		}
+		return null;
+	}
+```
+2.1 判断是不是web 应用
 
-	-----
+```java
 
-		private <T> Collection<T> getSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes, Object... args) {
-			ClassLoader classLoader = getClassLoader();
-			//获取key为ApplicationContextInitializer全类名的所有值，见下图2.2.1
-			Set<String> names = new LinkedHashSet<>(SpringFactoriesLoader.loadFactoryNames(type, classLoader));
-			//根据拿到的类名集合，使用反射创建对象放到集合中返回 见下图 2.2.2
-			List<T> instances = createSpringFactoriesInstances(type, parameterTypes, classLoader, args, names);
-			AnnotationAwareOrderComparator.sort(instances);
-			return instances;//返回到2 set
+static WebApplicationType deduceFromClasspath() {
+    //使用ClassUtils工具类判断当前是否响应式编程
+	if (ClassUtils.isPresent(WEBFLUX_INDICATOR_CLASS, null) && !ClassUtils.isPresent(WEBMVC_INDICATOR_CLASS, null)
+			&& !ClassUtils.isPresent(JERSEY_INDICATOR_CLASS, null)) {
+	return WebApplicationType.REACTIVE;
+	}
+	for (String className : SERVLET_INDICATOR_CLASSES) {
+		if (!ClassUtils.isPresent(className, null)) {
+			return WebApplicationType.NONE;
 		}
+	}
+//因为现在是使用原生的,所以这里直接返回WEB.SERVLET
+	return WebApplicationType.SERVLET;
+}
+```
+
+​	2.2 `getSpringFactoriesInstances(ApplicationContextInitializer.class))`
+
+```java
+	
+private <T> Collection<T> getSpringFactoriesInstances(Class<T> type) {
+	 //调用下面重载方法，type：ApplicationContextInitializer.class
+	return getSpringFactoriesInstances(type, new Class<?>[] {});
+}
+
+-------------
+
+private <T> Collection<T> getSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes, Object... args) {
+	ClassLoader classLoader = getClassLoader();
+	//获取key为ApplicationContextInitializer全类名的所有值，见下图2.2.1
+	Set<String> names = new LinkedHashSet<>(SpringFactoriesLoader.loadFactoryNames(type, classLoader));
+	//根据拿到的类名集合，使用反射创建对象放到集合中返回 见下图 2.2.2
+	List<T> instances = createSpringFactoriesInstances(type, parameterTypes, classLoader, args, names);
+	AnnotationAwareOrderComparator.sort(instances);
+	return instances;//返回到2 set
+}
+
+```
+
+2.2.1
 
 
-	2.2.1
-	
-	![](http://120.77.237.175:9080/photos/springboot/73.jpg)
-	
-	上图`(List)loadSpringFactories(classLoader).getOrDefault(factoryTypeName, Collections.emptyList())`中调用重载的方法：
-	
-		   //把类路径下所有META‐INF/spring.factories中的配置都存储起来，并返回，见下图
-		   (List)loadSpringFactories(classLoader)
-	
-	![](http://120.77.237.175:9080/photos/springboot/74.jpg)
-	
-	然后再调用**`getOrDefault(factoryTypeName, Collections.emptyList())`**方法，获取`key`为**`ApplicationContextInitializer`**类名的`value`集合
-	
-	![](http://120.77.237.175:9080/photos/springboot/75.jpg)
-	
-	2.2.2
-	
-		private <T> List<T> createSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes,
-			ClassLoader classLoader, Object[] args, Set<String> names) {
-			List<T> instances = new ArrayList<>(names.size());
-			for (String name : names) {
-				try {
-					Class<?> instanceClass = ClassUtils.forName(name, classLoader);
-					Assert.isAssignable(type, instanceClass);
-					Constructor<?> constructor = instanceClass.getDeclaredConstructor(parameterTypes);
-					T instance = (T) BeanUtils.instantiateClass(constructor, args);
-					instances.add(instance);
-				}
-				catch (Throwable ex) {
-					throw new IllegalArgumentException("Cannot instantiate " + type + " : " + name, ex);
-				}
-			}
-			return instances;
-		}
-	
-	![](http://120.77.237.175:9080/photos/springboot/76.jpg)
+![](http://120.77.237.175:9080/photos/springboot/73.jpg)
 
-3. 调用SpringApplication对象的run方法
+上图`(List)loadSpringFactories(classLoader).getOrDefault(factoryTypeName, Collections.emptyList())`中调用重载的方法：
 
-	![](http://120.77.237.175:9080/photos/springboot/77.png)
+```java
+   //把类路径下所有META‐INF/spring.factories中的配置都存储起来，并返回，见下图
+   (List)loadSpringFactories(classLoader)
+```
 
-		public ConfigurableApplicationContext run(String... args) {
-			StopWatch stopWatch = new StopWatch();
-			stopWatch.start();
-			 //声明IOC容器
-			ConfigurableApplicationContext context = null;
-			Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
-			configureHeadlessProperty();
-		   //从类路径下META‐INF/spring.factories获取SpringApplicationRunListeners，原理同2中获取ApplicationContextInitializer和ApplicationListener
-			SpringApplicationRunListeners listeners = getRunListeners(args);
-			//遍历上一步获取的所有SpringApplicationRunListener，调用其starting方法
-			listeners.starting();
+![](http://120.77.237.175:9080/photos/springboot/74.jpg)
+
+然后再调用**`getOrDefault(factoryTypeName, Collections.emptyList())`**方法，获取`key`为**`ApplicationContextInitializer`**类名的`value`集合
+
+![](http://120.77.237.175:9080/photos/springboot/75.jpg)
+
+2.2.2
+
+```java
+
+	private <T> List<T> createSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes,
+		ClassLoader classLoader, Object[] args, Set<String> names) {
+		List<T> instances = new ArrayList<>(names.size());
+		for (String name : names) {
 			try {
-				 //封装命令行
-				ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
-				//准备环境，把上面获取到的listeners传过去，见3.1
-				ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
-				configureIgnoreBeanInfo(environment);
-				 //打印Banner，就是控制台那个Spring字符画
-				Banner printedBanner = printBanner(environment);
-				//根据当前环境利用反射创建IOC容器,见3.2
-				context = createApplicationContext();
-				//从类路径下META‐INF/spring.factories获取SpringBootExceptionReporter，原理同2中获取ApplicationContextInitializer和ApplicationListener
-				exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
-						new Class[] { ConfigurableApplicationContext.class }, context);
-				//准备IOC容器，见3.3
-				prepareContext(context, environment, listeners, applicationArguments, printedBanner);
-				//刷新IOC容器，可查看文章里嵌入式Servlet容器启动原理
-				refreshContext(context);
-				//这是一个空方法
-				afterRefresh(context, applicationArguments);
-				stopWatch.stop();
-				if (this.logStartupInfo) {
-					new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
-				}
-				//调用所有SpringApplicationRunListener的started方法
-				listeners.started(context);
-				 //见3.5 ，从ioc容器中获取所有的ApplicationRunner和CommandLineRunner进行回调ApplicationRunner先回调，再CommandLineRunner
-				callRunners(context, applicationArguments);
+				Class<?> instanceClass = ClassUtils.forName(name, classLoader);
+				Assert.isAssignable(type, instanceClass);
+				Constructor<?> constructor = instanceClass.getDeclaredConstructor(parameterTypes);
+				T instance = (T) BeanUtils.instantiateClass(constructor, args);
+				instances.add(instance);
 			}
 			catch (Throwable ex) {
-				handleRunFailure(context, ex, exceptionReporters, listeners);
-				throw new IllegalStateException(ex);
+				throw new IllegalArgumentException("Cannot instantiate " + type + " : " + name, ex);
 			}
-		
+		}
+		return instances;
+	}
+
+```
+
+![](http://120.77.237.175:9080/photos/springboot/76.jpg)
+
+2.3 `getSpringFactoriesInstances(Bootstrapper.class)`
+
+```java
+	private <T> Collection<T> getSpringFactoriesInstances(Class<T> type) {
+        //点击进入
+		return getSpringFactoriesInstances(type, new Class<?>[] {});
+	}
+-------------------------------
+    private <T> Collection<T> getSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes, Object... args) {
+    	//首先获取类的加载器
+		ClassLoader classLoader = getClassLoader();
+		//去spring.factories加载org.springframework.boot.Bootstrapper启动类,当前没有配置,因此names为0
+		Set<String> names = new LinkedHashSet<>(SpringFactoriesLoader.loadFactoryNames(type, classLoader));
+    	//如有names不为空的话,就初始化实类返回
+		List<T> instances = createSpringFactoriesInstances(type, parameterTypes, classLoader, args, names);
+		AnnotationAwareOrderComparator.sort(instances);
+    	//当前instances返回为0
+		return instances;
+	}
+```
+
+2.4 找到9个监听器
+
+![](http://120.77.237.175:9080/photos/springboot/126.jpg)
+
+###   运行 SpringApplication
+
+调用SpringApplication对象的run方法
+
+  ![](http://120.77.237.175:9080/photos/springboot/77.png)
+
+  ```java
+  public ConfigurableApplicationContext run(String... args) {
+      //监控应用的启停
+  	StopWatch stopWatch = new StopWatch();
+      //点击进入,见4.0
+  	stopWatch.start();
+      //创建引导上下文(Context环境),店击进入,见5.0
+     DefaultBootstrapContext bootstrapContext = createBootstrapContext();
+  	 //声明IOC容器
+  	ConfigurableApplicationContext context = null;
+  	//Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();(2.4无此方法)
+     //让当前应用进入headless模式。java.awt.headless,点击进入,见6.0
+  	configureHeadlessProperty();
+      //获取所有的RunListener(运行监听器),点击进入,见7.0
+     //从类路径下META‐INF/spring.factories获取SpringApplicationRunListeners，原理同2中获取ApplicationContextInitializer和ApplicationListener
+  	//为了方便所有Listener进行事件感知
+      SpringApplicationRunListeners listeners = getRunListeners(args);
+  	//遍历上一步获取的所有SpringApplicationRunListener，调用其starting方法,点击进入,见8.0
+     //相当于通知所有感兴趣系统正在启动过程的人,项目正在starting
+  	listeners.starting();
+  	try {
+  		 //封装命令行参数,提前保存
+  		ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+  		//准备环境，把上面获取到的listeners传过去，见3.1
+  		ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
+        //绑定环境信息,跳过
+  		configureIgnoreBeanInfo(environment);
+  		 //打印Banner，就是控制台那个Spring字符画
+  		Banner printedBanner = printBanner(environment);
+  		//重点:创建IOC保存容器信息,根据当前环境利用反射创建IOC容器,见3.2
+  		context = createApplicationContext();
+        //保存Startup信息
+         context.setApplicationStartup(this.applicationStartup);
+  		//从类路径下META‐INF/spring.factories获取SpringBootExceptionReporter，原理同2中获取ApplicationContextInitializer和ApplicationListener
+  		//exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
+  				//new Class[] { ConfigurableApplicationContext.class }, context);(2.4无此方法)
+  		//准备IOC容器的基本信息，见3.3
+  		prepareContext(context, environment, listeners, applicationArguments, printedBanner);
+        //容器刷新完后工作
+  		//刷新IOC容器，(可查看文章里嵌入式Servlet容器启动原理),点击进入,3.5
+  		refreshContext(context);
+  		//这是一个空方法,跳过
+  		afterRefresh(context, applicationArguments);
+        //监控统计执行时间
+  		stopWatch.stop();
+  		if (this.logStartupInfo) {
+  			new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
+  		}
+  		//所有SpringApplicationRunListener的started方法
+  		listeners.started(context);
+  		 //进入见3.6 ，从ioc容器中获取所有的ApplicationRunner和CommandLineRunner进行回调ApplicationRunner先回调，再CommandLineRunner
+  		callRunners(context, applicationArguments);
+  	}
+  	catch (Throwable ex) {
+        //如以上有异常,调用监听器的failed方法,点击进入,3.7
+  		handleRunFailure(context, ex, exceptionReporters, listeners);
+  		throw new IllegalStateException(ex);
+  	}
+  
+  	try {
+  		//调用所有监听器SpringApplicationRunListener的running方法,通知所有的监听器 running
+  		listeners.running(context);
+  	}
+  	catch (Throwable ex) {
+        //running如果有问题。继续通知 failed 。调用所有 Listener 的 failed；通知所有的监听器 failed
+  		handleRunFailure(context, ex, exceptionReporters, null);
+  		throw new IllegalStateException(ex);
+  	}
+  	return context;
+  }
+  ```
+
+  **容器创建完成，返回步骤1处，最后返回到启动类**
+
+  3.1
+  	
+  ```java
+  private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
+  		ApplicationArguments applicationArguments) {
+  	//获取或者创建环境，有则获取，无则创建,点击进入
+  	ConfigurableEnvironment environment = getOrCreateEnvironment();
+  	//把上面获取到的配置环境信息,进行配置,点击进入,如下3.1.1
+  	configureEnvironment(environment, applicationArguments.getSourceArgs());
+      //绑定保存配置信息
+  	ConfigurationPropertySources.attach(environment);
+  	//创建环境完成后，调用前面获取的所有SpringApplicationRunListener的environmentPrepared方法
+      //通知所有的监听见器调用environmentPrepared()方法,环境准备完成,点击进入,如下3.1.2
+  	listeners.environmentPrepared(environment);
+      DefaultPropertiesPropertySource.moveToEnd(environment);
+      //激活哪些环境
+      configureAdditionalProfiles(environment);
+      bindToSpringApplication(environment);
+      if (!this.isCustomEnvironment) {
+          //这里还是准备环境信息
+          environment = new EnvironmentConverter(getClassLoader()).convertEnvironmentIfNecessary(environment,
+                                                                                                 deduceEnvironmentClass());
+      }
+      //还是进行环境信息绑定
+      ConfigurationPropertySources.attach(environment);
+      //将创建好的environment返回
+      return environment;
+  }
+==========================================
+    //根据当前应用返回创建基础环境信息,当前应用是SERVLET,返回StandardServletEnvironment
+    private ConfigurableEnvironment getOrCreateEnvironment() {
+		if (this.environment != null) {
+			return this.environment;
+		}
+		switch (this.webApplicationType) {
+		case SERVLET:
+			return new StandardServletEnvironment();
+		case REACTIVE:
+			return new StandardReactiveWebEnvironment();
+		default:
+			return new StandardEnvironment();
+		}
+}
+  ```
+
+3.1.1
+
+```java
+	protected void configureEnvironment(ConfigurableEnvironment environment, String[] args) {
+		if (this.addConversionService) {
+			ConversionService conversionService = ApplicationConversionService.getSharedInstance();
+			environment.setConversionService((ConfigurableConversionService) conversionService);
+		}
+  		//读取所有的配置源的配置属性值,点击进入
+		configurePropertySources(environment, args);
+        //激活Profiles环境,当前没配置,跳过
+		configureProfiles(environment, args);
+	}
+
+===========================================
+    //可以看到读取的是所有的配置源信息,(注解@PropertySource就是读取配置源)
+    protected void configurePropertySources(ConfigurableEnvironment environment, String[] args) {
+		MutablePropertySources sources = environment.getPropertySources();
+		DefaultPropertiesPropertySource.ifNotEmpty(this.defaultProperties, sources::addLast);
+		if (this.addCommandLineProperties && args.length > 0) {
+			String name = CommandLinePropertySource.COMMAND_LINE_PROPERTY_SOURCE_NAME;
+			if (sources.contains(name)) {
+				PropertySource<?> source = sources.get(name);
+				CompositePropertySource composite = new CompositePropertySource(name);
+				composite.addPropertySource(
+						new SimpleCommandLinePropertySource("springApplicationCommandLineArgs", args));
+				composite.addPropertySource(source);
+				sources.replace(name, composite);
+			}
+			else {
+				sources.addFirst(new SimpleCommandLinePropertySource(args));
+			}
+		}
+	}
+```
+
+  3.1.2
+
+```java
+//调用监听器的environmentPrepared()方法,可看接口7.0
+void environmentPrepared(ConfigurableBootstrapContext bootstrapContext, ConfigurableEnvironment environment) {
+		doWithListeners("spring.boot.application.environment-prepared",
+				(listener) -> listener.environmentPrepared(bootstrapContext, environment));
+	}
+```
+
+3.2
+
+  ```java
+//根据当前项目类型创建
+protected ConfigurableApplicationContext createApplicationContext() {
+    //进入
+		return this.applicationContextFactory.create(this.webApplicationType);
+}
+================
+    //当前应用是Servlet,创建返回AnnotationConfigServletWebServerApplicationContext
+    ApplicationContextFactory DEFAULT = (webApplicationType) -> {
+		try {
+			switch (webApplicationType) {
+			case SERVLET:
+				return new AnnotationConfigServletWebServerApplicationContext();
+			case REACTIVE:
+				return new AnnotationConfigReactiveWebServerApplicationContext();
+			default:
+				return new AnnotationConfigApplicationContext();
+			}
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException("Unable create a default ApplicationContext instance, "
+					+ "you may need a custom ApplicationContextFactory", ex);
+		}
+	};
+  ```
+
+  3.3
+
+  ```java
+  private void prepareContext(ConfigurableApplicationContext context, ConfigurableEnvironment environment,
+  		SpringApplicationRunListeners listeners, ApplicationArguments applicationArguments, Banner printedBanner) {
+  	 //将创建好的环境信息放到IOC容器中
+  	context.setEnvironment(environment);
+  	//IOC容器的后置处理流程,点击进入,见3.3.2
+  	postProcessApplicationContext(context);
+  	//应用初始化器,获取所有的ApplicationContextInitializer调用其initialize方法，这些ApplicationContextInitializer就是在2步骤中获取的，见3.3.1
+  	applyInitializers(context);
+  	//遍历所有的listeners,调用contextPrepared(),回调所有的SpringApplicationRunListener的contextPrepared方法，这些SpringApplicationRunListeners是在步骤3中获取的,点击进入3.3.3
+      //只找到一个,EventPublishRunListenr；通知所有的监听器contextPrepared
+  	listeners.contextPrepared(context);
+    bootstrapContext.close(context);
+  	//打印日志
+  	if (this.logStartupInfo) {
+  		logStartupInfo(context.getParent() == null);
+  		logStartupProfileInfo(context);
+  	}
+  	// Add boot specific singleton beans
+  	ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
+      //注册组件springApplicationArguments
+  	beanFactory.registerSingleton("springApplicationArguments", applicationArguments);
+  	if (printedBanner != null) {
+        //注册组件springBootBanner
+  		beanFactory.registerSingleton("springBootBanner", printedBanner);
+  	}
+  	if (beanFactory instanceof DefaultListableBeanFactory) {
+  		((DefaultListableBeanFactory) beanFactory)
+  				.setAllowBeanDefinitionOverriding(this.allowBeanDefinitionOverriding);
+  	}
+  	if (this.lazyInitialization) {
+  		context.addBeanFactoryPostProcessor(new LazyInitializationBeanFactoryPostProcessor());
+  	}
+  	// Load the sources
+  	Set<Object> sources = getAllSources();
+  	Assert.notEmpty(sources, "Sources must not be empty");
+  	load(context, sources.toArray(new Object[0]));
+     //这里又调用了监听器的contextLoaded()方法,所有的监听器 调用 contextLoaded。通知所有的监听器 contextLoaded；,点击进入3.3.4
+  	//回调所有的SpringApplicationRunListener的contextLoaded方法
+  	listeners.contextLoaded(context);
+  }
+  ```
+
+  `prepareContext`方法运行完毕，返回到步骤3，执行`refreshContext`方法
+
+  3.3.1
+
+  ```java
+//遍历所有的 ApplicationContextInitializer 。调用 initialize()方法。来对ioc容器进行初始化扩展功能
+//这里的ApplicationContextInitializer就是上面初始化时,加载的.factories里的ApplicationContextInitializer
+//这里获取到的ApplicationContextInitializer,就是上面图2.2.2的7个
+protected void applyInitializers(ConfigurableApplicationContext context) {
+  	for (ApplicationContextInitializer initializer : getInitializers()) {
+  		Class<?> requiredType = GenericTypeResolver.resolveTypeArgument(initializer.getClass(),
+  				ApplicationContextInitializer.class);
+  		Assert.isInstanceOf(requiredType, context, "Unable to call initializer.");
+  		initializer.initialize(context);
+  	}
+  }
+  ```
+
+3.3.2
+
+```java
+//注册一些组件,加载资源...
+protected void postProcessApplicationContext(ConfigurableApplicationContext context) {
+		if (this.beanNameGenerator != null) {
+			context.getBeanFactory().registerSingleton(AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR,
+					this.beanNameGenerator);
+		}
+		if (this.resourceLoader != null) {
+			if (context instanceof GenericApplicationContext) {
+				((GenericApplicationContext) context).setResourceLoader(this.resourceLoader);
+			}
+			if (context instanceof DefaultResourceLoader) {
+				((DefaultResourceLoader) context).setClassLoader(this.resourceLoader.getClassLoader());
+			}
+		}
+		if (this.addConversionService) {
+			context.getBeanFactory().setConversionService(ApplicationConversionService.getSharedInstance());
+		}
+	}
+```
+
+3.3.3
+
+```java
+	void contextPrepared(ConfigurableApplicationContext context) {
+       //进入
+		doWithListeners("spring.boot.application.context-prepared", (listener) -> listener.contextPrepared(context));
+	}
+==================================
+	private void doWithListeners(String stepName, Consumer<SpringApplicationRunListener> listenerAction) {
+        //进入
+		doWithListeners(stepName, listenerAction, null);
+	}
+=================================
+    //目前这里获取到的Listeners只有一个,如下图
+	private void doWithListeners(String stepName, Consumer<SpringApplicationRunListener> listenerAction,
+			Consumer<StartupStep> stepAction) {
+		StartupStep step = this.applicationStartup.start(stepName);
+		this.listeners.forEach(listenerAction);
+		if (stepAction != null) {
+			stepAction.accept(step);
+		}
+		step.end();
+	}
+```
+
+ ![](http://120.77.237.175:9080/photos/springboot/128.jpg)
+
+3.3.4
+
+```java
+	void contextLoaded(ConfigurableApplicationContext context) {
+        //进入
+		doWithListeners("spring.boot.application.context-loaded", (listener) -> listener.contextLoaded(context));
+	}
+===========================
+    private void doWithListeners(String stepName, Consumer<SpringApplicationRunListener> listenerAction) {
+    	//进入
+		doWithListeners(stepName, listenerAction, null);
+	}
+=================================
+	private void doWithListeners(String stepName, Consumer<SpringApplicationRunListener> listenerAction,
+			Consumer<StartupStep> stepAction) {
+		StartupStep step = this.applicationStartup.start(stepName);
+		this.listeners.forEach(listenerAction);
+		if (stepAction != null) {
+			stepAction.accept(step);
+		}
+		step.end();
+	}
+```
+
+ 3.4
+
+  ```java
+  private void callRunners(ApplicationContext context, ApplicationArguments args) {
+  	List<Object> runners = new ArrayList<>();
+  	runners.addAll(context.getBeansOfType(ApplicationRunner.class).values());
+  	runners.addAll(context.getBeansOfType(CommandLineRunner.class).values());
+  	AnnotationAwareOrderComparator.sort(runners);
+  	for (Object runner : new LinkedHashSet<>(runners)) {
+  		if (runner instanceof ApplicationRunner) {
+  			callRunner((ApplicationRunner) runner, args);
+  		}
+  		if (runner instanceof CommandLineRunner) {
+  			callRunner((CommandLineRunner) runner, args);
+  		}
+  	}
+  }
+  ```
+
+3.5
+
+```java
+	private void refreshContext(ConfigurableApplicationContext context) {
+		if (this.registerShutdownHook) {
 			try {
-				//调用所有SpringApplicationRunListener的running方法
-				listeners.running(context);
+				context.registerShutdownHook();
 			}
-			catch (Throwable ex) {
-				handleRunFailure(context, ex, exceptionReporters, null);
-				throw new IllegalStateException(ex);
+			catch (AccessControlException ex) {
+				// Not allowed in some environments.
 			}
-			return context;
 		}
+        //核心重点:进入
+		refresh((ApplicationContext) context);
+	}
+===============================
+    @Deprecated
+	protected void refresh(ApplicationContext applicationContext) {
+		Assert.isInstanceOf(ConfigurableApplicationContext.class, applicationContext);
+    	//进入
+		refresh((ConfigurableApplicationContext) applicationContext);
+	}
+=======================================================
+    protected void refresh(ConfigurableApplicationContext applicationContext) {
+    //进入
+		applicationContext.refresh();
+	}
+===========================================
+    @Override
+	public final void refresh() throws BeansException, IllegalStateException {
+		try {
+            //进入
+			super.refresh();
+		}
+		catch (RuntimeException ex) {
+			WebServer webServer = this.webServer;
+			if (webServer != null) {
+				webServer.stop();
+			}
+			throw ex;
+		}
+	}
+================================================
+    //重点经典的初始化过程,可以参考Spirng注解版
+    	@Override
+	public void refresh() throws BeansException, IllegalStateException {
+		synchronized (this.startupShutdownMonitor) {
+			StartupStep contextRefresh = this.applicationStartup.start("spring.context.refresh");
 
-	**容器创建完成，返回步骤1处，最后返回到启动类**
+			// Prepare this context for refreshing.
+			prepareRefresh();
+
+			// Tell the subclass to refresh the internal bean factory.
+			ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+
+			// Prepare the bean factory for use in this context.
+			prepareBeanFactory(beanFactory);
+
+			try {
+				// Allows post-processing of the bean factory in context subclasses.
+				postProcessBeanFactory(beanFactory);
+
+				StartupStep beanPostProcess = this.applicationStartup.start("spring.context.beans.post-process");
+				// Invoke factory processors registered as beans in the context.
+				invokeBeanFactoryPostProcessors(beanFactory);
+
+				// Register bean processors that intercept bean creation.
+				registerBeanPostProcessors(beanFactory);
+				beanPostProcess.end();
+
+				// Initialize message source for this context.
+				initMessageSource();
+
+				// Initialize event multicaster for this context.
+				initApplicationEventMulticaster();
+
+				// Initialize other special beans in specific context subclasses.
+				onRefresh();
+
+				// Check for listener beans and register them.
+				registerListeners();
+
+				//实例化所有的容器,上面之前已经获取到了
+				finishBeanFactoryInitialization(beanFactory);
+
+				// Last step: publish corresponding event.
+				finishRefresh();
+			}
+
+			catch (BeansException ex) {
+				if (logger.isWarnEnabled()) {
+					logger.warn("Exception encountered during context initialization - " +
+							"cancelling refresh attempt: " + ex);
+				}
+
+				// Destroy already created singletons to avoid dangling resources.
+				destroyBeans();
+
+				// Reset 'active' flag.
+				cancelRefresh(ex);
+
+				// Propagate exception to caller.
+				throw ex;
+			}
+
+			finally {
+				// Reset common introspection caches in Spring's core, since we
+				// might not ever need metadata for singleton beans anymore...
+				resetCommonCaches();
+				contextRefresh.end();
+			}
+		}
+	}
+```
+
+3.6
+
+```java
+	private void callRunners(ApplicationContext context, ApplicationArguments args) {
+		List<Object> runners = new ArrayList<>();
+        //获取容器中的ApplicationRunner
+		runners.addAll(context.getBeansOfType(ApplicationRunner.class).values());
+        //获取容器中的CommandLineRunner
+		runners.addAll(context.getBeansOfType(CommandLineRunner.class).values());
+        //合并所有runner并且按照@Order进行排序
+		AnnotationAwareOrderComparator.sort(runners);
+        //遍历所有的runner。调用 run 方法,其接口如下
+		for (Object runner : new LinkedHashSet<>(runners)) {
+			if (runner instanceof ApplicationRunner) {
+				callRunner((ApplicationRunner) runner, args);
+			}
+			if (runner instanceof CommandLineRunner) {
+				callRunner((CommandLineRunner) runner, args);
+			}
+		}
+	}
+=================================
+@FunctionalInterface
+public interface ApplicationRunner {
+
+	/**
+	 * Callback used to run the bean.
+	 * @param args incoming application arguments
+	 * @throws Exception on error
+	 */
+	void run(ApplicationArguments args) throws Exception;
+
+}
+================================
+ @FunctionalInterface
+public interface CommandLineRunner {
+
+	/**
+	 * Callback used to run the bean.
+	 * @param args incoming main method arguments
+	 * @throws Exception on error
+	 */
+	void run(String... args) throws Exception;
+
+}
+```
+
+3.7
+
+```java
 	
-	3.1
-		
-		private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
-				ApplicationArguments applicationArguments) {
-			//获取或者创建环境，有则获取，无则创建
-			ConfigurableEnvironment environment = getOrCreateEnvironment();
-			//配置环境
-			configureEnvironment(environment, applicationArguments.getSourceArgs());
-			ConfigurationPropertySources.attach(environment);
-			//创建环境完成后，调用前面获取的所有SpringApplicationRunListener的environmentPrepared方法
-			listeners.environmentPrepared(environment);
-			bindToSpringApplication(environment);
-			if (!this.isCustomEnvironment) {
-				environment = new EnvironmentConverter(getClassLoader()).convertEnvironmentIfNecessary(environment,
-						deduceEnvironmentClass());
+private void handleRunFailure(ConfigurableApplicationContext context, Throwable exception,
+			SpringApplicationRunListeners listeners) {
+		try {
+			try {
+				handleExitCode(context, exception);
+				if (listeners != null) {
+                    //调用listeners的failed()方法
+					listeners.failed(context, exception);
+				}
 			}
-			ConfigurationPropertySources.attach(environment);
-			//将创建好的environment返回
-			return environment;
+			finally {
+				reportFailure(getExceptionReporters(context), exception);
+				if (context != null) {
+					context.close();
+				}
+			}
 		}
+		catch (Exception ex) {
+			logger.warn("Unable to close ApplicationContext", ex);
+		}
+		ReflectionUtils.rethrowRuntimeException(exception);
+	}
+```
 
-	3.2
+4.0
 
-		protected ConfigurableApplicationContext createApplicationContext() {
-		Class<?> contextClass = this.applicationContextClass;
-			if (contextClass == null) {
-				try {
-					switch (this.webApplicationType) {
-					case SERVLET:
-						contextClass = Class.forName(DEFAULT_SERVLET_WEB_CONTEXT_CLASS);
-						break;
-					case REACTIVE:
-						contextClass = Class.forName(DEFAULT_REACTIVE_WEB_CONTEXT_CLASS);
-						break;
-					default:
-						contextClass = Class.forName(DEFAULT_CONTEXT_CLASS);
+```java
+public void start() throws IllegalStateException {
+    //再进入
+    this.start("");
+}
+=======================
+public void start(String taskName) throws IllegalStateException {
+    if (this.currentTaskName != null) {
+        throw new IllegalStateException("Can't start StopWatch: it's already running");
+    } else {
+        //把当前任务名保存
+        this.currentTaskName = taskName;
+        //记录应用的启动时间
+        this.startTimeNanos = System.nanoTime();
+    }
+}
+```
+
+5.0
+
+```java
+private DefaultBootstrapContext createBootstrapContext() {
+    //初始化引导上下文
+   DefaultBootstrapContext bootstrapContext = new DefaultBootstrapContext();
+    //这里的bootstrappers,就是上面在创建应用时的引导器,当有配置的时候,就会在这里编译执行intitialize初始化来完成对引导启动器上下文环境设置,其接口如下,
+    //因为没配置,所以这里也是返回为0
+   this.bootstrappers.forEach((initializer) -> initializer.intitialize(bootstrapContext));
+   return bootstrapContext;
+}
+
+====================================
+public interface Bootstrapper {
+
+	/**
+	 * Initialize the given {@link BootstrapRegistry} with any required registrations.
+	 * @param registry the registry to initialize
+	 */
+	void intitialize(BootstrapRegistry registry);
+
+}
+```
+
+6.0
+
+```java
+	private void configureHeadlessProperty() {
+		System.setProperty(SYSTEM_PROPERTY_JAVA_AWT_HEADLESS,
+				System.getProperty(SYSTEM_PROPERTY_JAVA_AWT_HEADLESS, Boolean.toString(this.headless)));
+	}
+```
+
+7.0
+
+```java
+//这里看到有	getSpringFactoriesInstances就是去spring.factories找SpringApplicationRunListener
+private SpringApplicationRunListeners getRunListeners(String[] args) {
+		Class<?>[] types = new Class<?>[] { SpringApplication.class, String[].class };
+    //初始化Listener,把找到的Listener保存到List里,最终只找到一个EventPublishingRunListener
+    //其Listener接口如下图显示
+		return new SpringApplicationRunListeners(logger,
+				getSpringFactoriesInstances(SpringApplicationRunListener.class, types, this, args),
+				this.applicationStartup);
+	}
+```
+
+![](http://120.77.237.175:9080/photos/springboot/127.jpg)
+
+8.0
+
+```java
+	void starting(ConfigurableBootstrapContext bootstrapContext, Class<?> mainApplicationClass) {
+        //点击进入
+		doWithListeners("spring.boot.application.starting", (listener) -> listener.starting(bootstrapContext),
+				(step) -> {
+					if (mainApplicationClass != null) {
+						step.tag("mainApplicationClass", mainApplicationClass.getName());
 					}
-				}
-				catch (ClassNotFoundException ex) {
-					throw new IllegalStateException(
-							"Unable create a default ApplicationContext, please specify an ApplicationContextClass", ex);
-				}
-			}
-			//将创建好的IOC容器返回
-			return (ConfigurableApplicationContext) BeanUtils.instantiateClass(contextClass);
+				});
+	}
+============================
+    //遍历所有的Listener执行上面的starting()方法
+	private void doWithListeners(String stepName, Consumer<SpringApplicationRunListener> listenerAction,
+			Consumer<StartupStep> stepAction) {
+		StartupStep step = this.applicationStartup.start(stepName);
+		this.listeners.forEach(listenerAction);
+		if (stepAction != null) {
+			stepAction.accept(step);
 		}
+		step.end();
+	}
+```
 
-	3.3
 
-		private void prepareContext(ConfigurableApplicationContext context, ConfigurableEnvironment environment,
-				SpringApplicationRunListeners listeners, ApplicationArguments applicationArguments, Banner printedBanner) {
-			 //将创建好的环境放到IOC容器中
-			context.setEnvironment(environment);
-			//注册一些组件
-			postProcessApplicationContext(context);
-			/获取所有的ApplicationContextInitializer调用其initialize方法，这些ApplicationContextInitializer就是在2步骤中获取的，见3.3.1
-			applyInitializers(context);
-			//回调所有的SpringApplicationRunListener的contextPrepared方法，这些SpringApplicationRunListeners是在步骤3中获取的
-			listeners.contextPrepared(context);
-			//打印日志
-			if (this.logStartupInfo) {
-				logStartupInfo(context.getParent() == null);
-				logStartupProfileInfo(context);
-			}
-			// Add boot specific singleton beans
-			ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
-			beanFactory.registerSingleton("springApplicationArguments", applicationArguments);
-			if (printedBanner != null) {
-				beanFactory.registerSingleton("springBootBanner", printedBanner);
-			}
-			if (beanFactory instanceof DefaultListableBeanFactory) {
-				((DefaultListableBeanFactory) beanFactory)
-						.setAllowBeanDefinitionOverriding(this.allowBeanDefinitionOverriding);
-			}
-			if (this.lazyInitialization) {
-				context.addBeanFactoryPostProcessor(new LazyInitializationBeanFactoryPostProcessor());
-			}
-			// Load the sources
-			Set<Object> sources = getAllSources();
-			Assert.notEmpty(sources, "Sources must not be empty");
-			load(context, sources.toArray(new Object[0]));
-			//回调所有的SpringApplicationRunListener的contextLoaded方法
-			listeners.contextLoaded(context);
-		}
-
-	`prepareContext`方法运行完毕，返回到步骤3，执行`refreshContext`方法
-
-	3.3.1
-
-		protected void applyInitializers(ConfigurableApplicationContext context) {
-			for (ApplicationContextInitializer initializer : getInitializers()) {
-				Class<?> requiredType = GenericTypeResolver.resolveTypeArgument(initializer.getClass(),
-						ApplicationContextInitializer.class);
-				Assert.isInstanceOf(requiredType, context, "Unable to call initializer.");
-				initializer.initialize(context);
-			}
-		}
-
-	3.4
-
-		private void callRunners(ApplicationContext context, ApplicationArguments args) {
-			List<Object> runners = new ArrayList<>();
-			runners.addAll(context.getBeansOfType(ApplicationRunner.class).values());
-			runners.addAll(context.getBeansOfType(CommandLineRunner.class).values());
-			AnnotationAwareOrderComparator.sort(runners);
-			for (Object runner : new LinkedHashSet<>(runners)) {
-				if (runner instanceof ApplicationRunner) {
-					callRunner((ApplicationRunner) runner, args);
-				}
-				if (runner instanceof CommandLineRunner) {
-					callRunner((CommandLineRunner) runner, args);
-				}
-			}
-		}
 
 ## 事件监听机制 ##
 
 1. 创建`ApplicationContextInitializer`和`SpringApplicationRunListener`的实现类
 
-		public class TestApplicationContextInitializer implements ApplicationContextInitializer {
-		    @Override
-		    public void initialize(ConfigurableApplicationContext configurableApplicationContext) {
-		        System.out.println("TestApplicationContextInitializer initialize..."+configurableApplicationContext);
-		    }
-		}
+  ```java
+  public class TestApplicationContextInitializer implements ApplicationContextInitializer {
+      @Override
+      public void initialize(ConfigurableApplicationContext configurableApplicationContext) {
+          System.out.println("TestApplicationContextInitializer initialize..."+configurableApplicationContext);
+      }
+  }
+  ```
 
-	----
+  ----
 
-		public class TestSpringApplicationRunListener implements SpringApplicationRunListener {
-		@Override
-		public void starting() {
-		    System.out.println("TestSpringApplicationRunListener starting...");
-		}
-		
-		@Override
-		public void environmentPrepared(ConfigurableEnvironment environment) {
-		    System.out.println("TestSpringApplicationRunListener environmentPrepared...");
-		}
-		
-		@Override
-		public void contextPrepared(ConfigurableApplicationContext context) {
-		    System.out.println("TestSpringApplicationRunListener contextPrepared...");
-		}
-		
-		@Override
-		public void contextLoaded(ConfigurableApplicationContext context) {
-		    System.out.println("TestSpringApplicationRunListener contextLoaded...");
-		}
-		
-		@Override
-		public void started(ConfigurableApplicationContext context) {
-		    System.out.println("TestSpringApplicationRunListener started...");
-		}
-		
-		@Override
-		public void running(ConfigurableApplicationContext context) {
-		    System.out.println("TestSpringApplicationRunListener running...");
-		}
-		
-		@Override
-		public void failed(ConfigurableApplicationContext context, Throwable exception) {
-		    System.out.println("TestSpringApplicationRunListener failed...");
-		}
-		
-		}
+  ```java
+  public class TestSpringApplicationRunListener implements SpringApplicationRunListener {
+  @Override
+  public void starting() {
+      System.out.println("TestSpringApplicationRunListener starting...");
+  }
+  
+  @Override
+  public void environmentPrepared(ConfigurableEnvironment environment) {
+      System.out.println("TestSpringApplicationRunListener environmentPrepared...");
+  }
+  
+  @Override
+  public void contextPrepared(ConfigurableApplicationContext context) {
+      System.out.println("TestSpringApplicationRunListener contextPrepared...");
+  }
+  
+  @Override
+  public void contextLoaded(ConfigurableApplicationContext context) {
+      System.out.println("TestSpringApplicationRunListener contextLoaded...");
+  }
+  
+  @Override
+  public void started(ConfigurableApplicationContext context) {
+      System.out.println("TestSpringApplicationRunListener started...");
+  }
+  
+  @Override
+  public void running(ConfigurableApplicationContext context) {
+      System.out.println("TestSpringApplicationRunListener running...");
+  }
+  
+  @Override
+  public void failed(ConfigurableApplicationContext context, Throwable exception) {
+      System.out.println("TestSpringApplicationRunListener failed...");
+  }
+  
+  }
+  ```
+
+  创建ApplicationListener
+
+2. ```java
+   public class TestApplicationListener implements ApplicationListener {
+       @Override
+       public void onApplicationEvent(ApplicationEvent event) {
+           System.out.println("MyApplicationListener.....onApplicationEvent...");
+       }
+   }
+   ```
+
+   
 
 
 2. 在`META-INF/spring.factories`文件中配置
 
-		org.springframework.boot.SpringApplicationRunListener=\ com.springboot.starter.springbootstarter.listener.TestSpringApplicationRunListener
-		com.springboot.starter.springbootstarter.listener.TestSpringApplicationRunListener=\ com.springboot.starter.springbootstarter.listener.TestApplicationContextInitializer
+   ```java
+   org.springframework.boot.SpringApplicationRunListener=\ com.springboot.starter.springbootstarter.listener.TestSpringApplicationRunListener
+   com.springboot.starter.springbootstarter.listener.TestSpringApplicationRunListener=\ com.springboot.starter.springbootstarter.listener.TestApplicationContextInitializer
+   ```
 
 3. 创建`ApplicationRunner`实现类和`CommandLineRunner`实现类，注入到容器中
 
-		@Component
-		public class TestApplicationRunner implements ApplicationRunner {
-		    @Override
-		    public void run(ApplicationArguments args) throws Exception {
-		        System.out.println("TestApplicationRunner ..."+args);
-		    }
-		}
+	```java
+	@Component
+	public class TestApplicationRunner implements ApplicationRunner {
+	    @Override
+	    public void run(ApplicationArguments args) throws Exception {
+	        System.out.println("TestApplicationRunner ..."+args);
+	    }
+}
+	```
 
 	----
-
-		@Component
-		public class TestCommandLineRunner implements CommandLineRunner {
-		    @Override
-		    public void run(String... args) throws Exception {
-		        System.out.println("TestCommandLineRunner..."+ Arrays.asList(args));
-		    }
-		}
+	
+	```java
+	/**
+	 * 应用启动做一个一次性事情
+	 */
+	@Order(2)	//可以定义启动顺序
+	@Component
+	public class TestCommandLineRunner implements CommandLineRunner {
+	    @Override
+	    public void run(String... args) throws Exception {
+	        System.out.println("TestCommandLineRunner..."+ Arrays.asList(args));
+	    }
+	}
+	```
 
 **注意:启动时会报错,说是没有找到带`org.springframework.boot.SpringApplication`和`String`数组类型参数的构造器，给`TestSpringApplicationRunListener`添加这样的构造器**
 
 ![](http://120.77.237.175:9080/photos/springboot/78.jpg)
 
-	//必须有的构造器
-	public TestSpringApplicationRunListener(SpringApplication application, String[] args) {
-	}
+```java
+//必须有的构造器
+public TestSpringApplicationRunListener(SpringApplication application, String[] args) {
+	//可以application放在当前自定义里,进行各种设置
+	 this.application = application;
+}
+```
 ![](http://120.77.237.175:9080/photos/springboot/79.jpg)
 
-# 自定义starter #
+# 自定义Starter #
 
 - 启动器只用来做依赖导入
 - 专门来写一个自动配置模块；
@@ -10395,243 +11815,270 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 
 ### 命名 ###
 
-	模块名-spring-boot-starter
+```java
+模块名-spring-boot-starter
+```
 
 ### 如何编写自动配置 ###
 
-	@Configuration  //指定这个类是一个配置类
-	@ConditionalOnXXX  //在指定条件成立的情况下自动配置类生效
-	@AutoConfigureAfter  //指定自动配置类的顺序
-	@Bean  //给容器中添加组件
-	
-	@ConfigurationPropertie结合相关xxxProperties类来绑定相关的配置
-	@EnableConfigurationProperties //让xxxProperties生效加入到容器中
-	public class XxxxAutoConfiguration {
-		.....
-	}
+```java
+@Configuration  //指定这个类是一个配置类
+@ConditionalOnXXX  //在指定条件成立的情况下自动配置类生效
+@AutoConfigureAfter  //指定自动配置类的顺序
+@Bean  //给容器中添加组件
+
+@ConfigurationPropertie结合相关xxxProperties类来绑定相关的配置
+@EnableConfigurationProperties //让xxxProperties生效加入到容器中
+public class XxxxAutoConfiguration {
+	.....
+}
+```
 
 自动配置类要能加载,将需要启动就加载的自动配置类，配置在**`META-INF/spring.factories`**
 
-	org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-	org.springframework.boot.autoconfigure.admin.SpringApplicationAdminJmxAutoConfiguration,\
-	org.springframework.boot.autoconfigure.aop.AopAutoConfiguration,\
+```java
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+org.springframework.boot.autoconfigure.admin.SpringApplicationAdminJmxAutoConfiguration,\
+org.springframework.boot.autoconfigure.aop.AopAutoConfiguration,\
+```
 
 ## 测试 ##
 
 1. 创建一个自动配置模块，和创建普通`springboot`项目一样，不需要引入其他`starter(SpringBoot-Starter-Define-Configure)`
 
-		<?xml version="1.0" encoding="UTF-8"?>
-		<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-		    <modelVersion>4.0.0</modelVersion>
-		    <parent>
-		        <groupId>org.springframework.boot</groupId>
-		        <artifactId>spring-boot-starter-parent</artifactId>
-		        <version>2.2.5.RELEASE</version>
-		        <relativePath/> <!-- lookup parent from repository -->
-		    </parent>
-		    <groupId>com.springboot.starter.define.configure</groupId>
-		    <artifactId>springboot-starter-define-configure</artifactId>
-		    <version>0.0.1-SNAPSHOT</version>
-		    <name>springboot-starter-define-configure</name>
-		    <description>Demo project for Spring Boot</description>
-		    <packaging>jar</packaging>
-		
-		    <properties>
-		        <java.version>1.8</java.version>
-		    </properties>
-		
-		    <dependencies>
-		        <!--引入spring‐boot‐starter；所有starter的基本配置-->
-		        <dependency>
-		            <groupId>org.springframework.boot</groupId>
-		            <artifactId>spring-boot-starter</artifactId>
-		        </dependency>
-		
-		        <!--可以生成配置类提示文件-->
-		        <dependency>
-		            <groupId>org.springframework.boot</groupId>
-		            <artifactId>spring-boot-configuration-processor</artifactId>
-		            <optional>true</optional>
-		        </dependency>
-		    </dependencies>
-		
-		</project>
+   ```java
+   <?xml version="1.0" encoding="UTF-8"?>
+   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+       <modelVersion>4.0.0</modelVersion>
+       <parent>
+           <groupId>org.springframework.boot</groupId>
+           <artifactId>spring-boot-starter-parent</artifactId>
+           <version>2.2.5.RELEASE</version>
+           <relativePath/> <!-- lookup parent from repository -->
+       </parent>
+       <groupId>com.springboot.starter.define.configure</groupId>
+       <artifactId>springboot-starter-define-configure</artifactId>
+       <version>0.0.1-SNAPSHOT</version>
+       <name>springboot-starter-define-configure</name>
+       <description>Demo project for Spring Boot</description>
+       <packaging>jar</packaging>
+   
+       <properties>
+           <java.version>1.8</java.version>
+       </properties>
+   
+       <dependencies>
+           <!--引入spring‐boot‐starter；所有starter的基本配置-->
+           <dependency>
+               <groupId>org.springframework.boot</groupId>
+               <artifactId>spring-boot-starter</artifactId>
+           </dependency>
+   
+           <!--可以生成配置类提示文件-->
+           <dependency>
+               <groupId>org.springframework.boot</groupId>
+               <artifactId>spring-boot-configuration-processor</artifactId>
+               <optional>true</optional>
+           </dependency>
+       </dependencies>
+   
+   </project>
+   ```
 
 2. 创建配置类和自动配置类
 
-		@ConfigurationProperties(prefix = "define.hello")
-		public class HelloProperties {
-		
-		    private String prefix;
-		    private String suffix;
-		
-		    public String getPrefix() {
-		        return prefix;
-		    }
-		
-		    public void setPrefix(String prefix) {
-		        this.prefix = prefix;
-		    }
-		
-		    public String getSuffix() {
-		        return suffix;
-		    }
-		
-		    public void setSuffix(String suffix) {
-		        this.suffix = suffix;
-		    }
-		}
+   ```java
+   @ConfigurationProperties(prefix = "define.hello")
+   public class HelloProperties {
+   
+       private String prefix;
+       private String suffix;
+   
+       public String getPrefix() {
+           return prefix;
+       }
+   
+       public void setPrefix(String prefix) {
+           this.prefix = prefix;
+       }
+   
+       public String getSuffix() {
+           return suffix;
+       }
+   
+       public void setSuffix(String suffix) {
+           this.suffix = suffix;
+       }
+   }
+   ```
 
-	----
+   ----
 
-		public class HelloService {
-		
-		    HelloProperties helloProperties;
-		
-		    public HelloProperties seHelloProperties(HelloProperties helloProperties){
-		        return this.helloProperties = helloProperties;
-		    }
-		
-		    public HelloProperties getHelloProperties()
-		    {
-		        return this.helloProperties;
-		    }
-		
-		    public String sayHello(String name)
-		    {
-		        return this.helloProperties.getPrefix() + " ---- " + name + "----"+ this.helloProperties.getSuffix();
-		    }
-		
-		}
+   ```java
+   /**
+    * 默认不要放在容器中
+    */
+   public class HelloService {
+   
+       HelloProperties helloProperties;
+   
+       public HelloProperties seHelloProperties(HelloProperties helloProperties){
+           return this.helloProperties = helloProperties;
+       }
+   
+       public HelloProperties getHelloProperties()
+       {
+           return this.helloProperties;
+       }
+   
+       public String sayHello(String name)
+       {
+           return this.helloProperties.getPrefix() + " ---- " + name + "----"+ this.helloProperties.getSuffix();
+       }
+   
+   }
+   ```
 
-	---
+   ---
 
-		@Configuration
-		@ConditionalOnWebApplication    //web应用才生效
-		@EnableConfigurationProperties(HelloProperties.class)   //让配置类生效，(注入到容器中)
-		public class SpringbootStarterDefineConfigureApplication {
-		
-		    @Autowired
-		    HelloProperties helloProperties;
-		
-		    @Bean
-		    public HelloService helloService()
-		    {
-		        HelloService helloService = new HelloService();
-		        helloService.seHelloProperties(helloProperties);
-		        return helloService;
-		    }
-		    
-		}
+   ```java
+   @Configuration
+   @ConditionalOnWebApplication    //web应用才生效
+   @EnableConfigurationProperties(HelloProperties.class)   //让配置类生效，(注入到容器中)
+   public class SpringbootStarterDefineConfiguration {
+   
+       @Autowired
+       HelloProperties helloProperties;
+   
+       @ConditionalOnMissingBean(HelloService.class)   //当容器里没有HelloService才加载
+       @Bean
+       public HelloService helloService()
+       {
+           HelloService helloService = new HelloService();
+           helloService.seHelloProperties(helloProperties);
+           return helloService;
+       }
+   
+   }
+   
+   ```
 
 3. 在`resources`文件夹下创建`META-INF/spring.factories`
 
-		org.springframework.boot.autoconfigure.EnableAutoConfiguration=\ com.springboot.starter.define.configure.SpringbootStarterDefineConfigureApplication
+   ```java
+   org.springframework.boot.autoconfigure.EnableAutoConfiguration=\ com.springboot.starter.define.configure.auto.SpringbootStarterDefineConfiguration
+   ```
 
 4. 安装到本地仓库
-5. 创建starter，选择maven工程即可，只是用于管理依赖，添加对AutoConfiguration模块的依赖
+5. 创建starter，选择maven工程即可，只是用于管理依赖，添加对`AutoConfiguration`模块的依赖
 
-	![](http://120.77.237.175:9080/photos/springboot/81.jpg)
+  ![](http://120.77.237.175:9080/photos/springboot/81.jpg)
 
-		<?xml version="1.0" encoding="UTF-8"?>
-		<project xmlns="http://maven.apache.org/POM/4.0.0"
-		         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-		    <parent>
-		        <artifactId>SpringBoot</artifactId>
-		        <groupId>com.spring</groupId>
-		        <version>1.0-SNAPSHOT</version>
-		    </parent>
-		    <modelVersion>4.0.0</modelVersion>
-		
-		    <groupId>com.springboot.starter.define</groupId>
-		    <artifactId>springboot-starter-define</artifactId>
-		    <version>1.0-SNAPSHOT</version>
-		
-		    <dependencies>
-		        <dependency>
-		            <groupId>com.springboot.starter.define.configure</groupId>
-		            <artifactId>springboot-starter-define-configure</artifactId>
-		            <version>0.0.1-SNAPSHOT</version>
-		        </dependency>
-		    </dependencies>
-		
-		</project>
+  ```java
+  <?xml version="1.0" encoding="UTF-8"?>
+  <project xmlns="http://maven.apache.org/POM/4.0.0"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+      <parent>
+          <artifactId>SpringBoot</artifactId>
+          <groupId>com.spring</groupId>
+          <version>1.0-SNAPSHOT</version>
+      </parent>
+      <modelVersion>4.0.0</modelVersion>
+  
+      <groupId>com.springboot.starter.define</groupId>
+      <artifactId>springboot-starter-define</artifactId>
+      <version>1.0-SNAPSHOT</version>
+  
+      <dependencies>
+          <dependency>
+              <groupId>com.springboot.starter.define.configure</groupId>
+              <artifactId>springboot-starter-define-configure</artifactId>
+              <version>0.0.1-SNAPSHOT</version>
+          </dependency>
+      </dependencies>
+  
+  </project>
+  ```
 
 6. 安装到本地仓库
 7. 在`SpringBoot-Starter`进行测试，必须要web场景，因为设置是web场景才生效
 
-		<?xml version="1.0" encoding="UTF-8"?>
-		<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-		    <modelVersion>4.0.0</modelVersion>
-		    <parent>
-		        <groupId>org.springframework.boot</groupId>
-		        <artifactId>spring-boot-starter-parent</artifactId>
-		        <version>2.2.7.RELEASE</version>
-		        <relativePath/> <!-- lookup parent from repository -->
-		    </parent>
-		    <groupId>com.springboot.starter</groupId>
-		    <artifactId>springboot-starter</artifactId>
-		    <version>0.0.1-SNAPSHOT</version>
-		    <name>springboot-starter</name>
-		    <description>Demo project for Spring Boot</description>
-		
-		    <properties>
-		        <java.version>1.8</java.version>
-		    </properties>
-		
-		    <dependencies>
-		        <dependency>
-		            <groupId>org.springframework.boot</groupId>
-		            <artifactId>spring-boot-starter-web</artifactId>
-		        </dependency>
-		
-		        <dependency>
-		            <groupId>org.springframework.boot</groupId>
-		            <artifactId>spring-boot-starter-test</artifactId>
-		            <scope>test</scope>
-		            <exclusions>
-		                <exclusion>
-		                    <groupId>org.junit.vintage</groupId>
-		                    <artifactId>junit-vintage-engine</artifactId>
-		                </exclusion>
-		            </exclusions>
-		        </dependency>
-		
-		        <dependency>
-		            <groupId>com.springboot.starter.define</groupId>
-		            <artifactId>springboot-starter-define</artifactId>
-		            <version>1.0-SNAPSHOT</version>
-		        </dependency>
-		    </dependencies>
-		
-		    <build>
-		        <plugins>
-		            <plugin>
-		                <groupId>org.springframework.boot</groupId>
-		                <artifactId>spring-boot-maven-plugin</artifactId>
-		            </plugin>
-		        </plugins>
-		    </build>
-		
-		</project>
+   ```java
+   <?xml version="1.0" encoding="UTF-8"?>
+   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+       <modelVersion>4.0.0</modelVersion>
+       <parent>
+           <groupId>org.springframework.boot</groupId>
+           <artifactId>spring-boot-starter-parent</artifactId>
+           <version>2.3.7.RELEASE</version>
+           <relativePath/> <!-- lookup parent from repository -->
+       </parent>
+       <groupId>com.springboot.starter</groupId>
+       <artifactId>springboot-starter</artifactId>
+       <version>0.0.1-SNAPSHOT</version>
+       <name>springboot-starter</name>
+       <description>Demo project for Spring Boot</description>
+   
+       <properties>
+           <java.version>1.8</java.version>
+       </properties>
+   
+       <dependencies>
+           <dependency>
+               <groupId>org.springframework.boot</groupId>
+               <artifactId>spring-boot-starter-web</artifactId>
+           </dependency>
+   
+           <dependency>
+               <groupId>org.springframework.boot</groupId>
+               <artifactId>spring-boot-starter-test</artifactId>
+               <scope>test</scope>
+               <exclusions>
+                   <exclusion>
+                       <groupId>org.junit.vintage</groupId>
+                       <artifactId>junit-vintage-engine</artifactId>
+                   </exclusion>
+               </exclusions>
+           </dependency>
+   
+           <dependency>
+               <groupId>com.springboot.starter.define</groupId>
+               <artifactId>springboot-starter-define</artifactId>
+               <version>1.0-SNAPSHOT</version>
+           </dependency>
+       </dependencies>
+   
+       <build>
+           <plugins>
+               <plugin>
+                   <groupId>org.springframework.boot</groupId>
+                   <artifactId>spring-boot-maven-plugin</artifactId>
+               </plugin>
+           </plugins>
+       </build>
+   
+   </project>
+   ```
 
 8. 创建`Controller`
 
-		@RestController
-		public class HelloController {
-		
-		    @Autowired
-		    HelloService helloService;
-		
-		    @GetMapping("/hello")
-		    public String Hello()
-		    {
-		        return helloService.sayHello("张三");
-		    }
-		}
+	```java
+	@RestController
+	public class HelloController {
+	
+	    @Autowired
+	    HelloService helloService;
+	
+	    @GetMapping("/hello")
+	    public String Hello()
+	    {
+	        return helloService.sayHello("张三");
+	    }
+	}
+	```
 
 
 9. 在配置文件中配置
@@ -10642,3 +12089,24 @@ SpringBoot默认使用Tomcat作为嵌入式的Servlet容器
 10. 启动项目访问`/hello`
 
 		你好 ---- 张三----hello
+
+11. 重新自定义加载HelloService后,Stater的配置类失效
+
+    ```java
+    @Configuration
+    public class MyConfig {
+    
+      /**
+       * 当重新自定义加载HelloService后,Stater的配置类失效
+       * @return
+       */
+      /*@Bean
+      public HelloService helloService() {
+        HelloService helloService = new HelloService();
+    
+        return helloService;
+      }*/
+    }
+    ```
+
+    

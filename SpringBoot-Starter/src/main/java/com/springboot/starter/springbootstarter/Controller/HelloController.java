@@ -1,6 +1,6 @@
 package com.springboot.starter.springbootstarter.Controller;
 
-import com.springboot.starter.define.configure.starter.HelloService;
+import com.springboot.starter.define.configure.service.HelloService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

@@ -1,0 +1,22 @@
+{
+  "groups": [
+    {
+      "name": "define.hello",
+      "type": "com.springboot.starter.define.configure.bean.HelloProperties",
+      "sourceType": "com.springboot.starter.define.configure.bean.HelloProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "define.hello.prefix",
+      "type": "java.lang.String",
+      "sourceType": "com.springboot.starter.define.configure.bean.HelloProperties"
+    },
+    {
+      "name": "define.hello.suffix",
+      "type": "java.lang.String",
+      "sourceType": "com.springboot.starter.define.configure.bean.HelloProperties"
+    }
+  ],
+  "hints": []
+}
