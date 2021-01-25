@@ -41,6 +41,7 @@ spring:
         login-password: admin
         allow: 127.0.0.1
 
+#配置Mybatis规则
 #mybatis:
   #configuration:
     #map-underscore-to-camel-case: true

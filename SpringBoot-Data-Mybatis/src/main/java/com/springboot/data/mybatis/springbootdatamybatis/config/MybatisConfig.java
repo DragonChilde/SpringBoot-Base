@@ -1,10 +1,6 @@
 package com.springboot.data.mybatis.springbootdatamybatis.config;
 
-import org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
+/*@Configuration
 public class MybatisConfig {
 
     @Bean
@@ -18,4 +14,4 @@ public class MybatisConfig {
         };
 
     }
-}
+}*/

@@ -10385,90 +10385,249 @@ private List<Resource> getScripts(String propertyName, List<String> resources, S
 
 ## 整合Druid数据源 ##
 
-**依赖**
+### Druid地址
 
-	 <dependency>
-	    <groupId>com.alibaba</groupId>
-	    <artifactId>druid-spring-boot-starter</artifactId>
-	    <version>1.1.20</version>
-	</dependency>
+https://github.com/alibaba/druid
 
-**增加配置**
+整合第三方技术的两种方式
 
-	spring:
-	  datasource:
-		 type: com.alibaba.druid.pool.DruidDataSource  #配置Druid连接池
+- 自定义
+- 找starter
+
+### 自定义方式
+
+1. 依赖
+
+```java
+  <dependency>
+          <groupId>com.alibaba</groupId>
+          <artifactId>druid</artifactId>
+          <version>1.1.20</version>
+   </dependency>
+```
+
+2. 配置类
+
+```java
+@Configuration
+public class DruidConfig {
+
+  // 默认的自动配置是判断容器中没有才会配@ConditionalOnMissingBean(DataSource.class)
+  @ConfigurationProperties(prefix = "spring.datasource")
+  @Bean
+  public DataSource druid() {
+    DruidDataSource dataSource = new DruidDataSource();
+    try {
+      dataSource.setFilters("stat,wall");
+    } catch (SQLException throwables) {
+      throwables.printStackTrace();
+    }
+    return dataSource;
+  }
+
+  // 配置Druid的监控页面功能
+  // 1、配置一个管理后台的Servlet
+  @Bean
+  public ServletRegistrationBean statViewServlet() {
+    ServletRegistrationBean bean = new ServletRegistrationBean(new StatViewServlet(), "/druid/*");
+    Map<String, String> initParams = new HashMap<>();
+
+    initParams.put("loginUsername", "admin");
+    initParams.put("loginPassword", "admin");
+    initParams.put("allow", ""); // 默认就是允许所有访问
+    bean.setInitParameters(initParams);
+    return bean;
+  }
+
+  // 2、配置一个web监控的filter
+  @Bean
+  public FilterRegistrationBean webStatFilter() {
+    WebStatFilter webStatFilter = new WebStatFilter();
+
+    FilterRegistrationBean<WebStatFilter> filterRegistrationBean =
+        new FilterRegistrationBean<>(webStatFilter);
+
+    filterRegistrationBean.addInitParameter(
+        "exclusions", "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*");
+
+    filterRegistrationBean.setUrlPatterns(Arrays.asList("/*"));
+
+    return filterRegistrationBean;
+  }
+}
+```
+
+
+
+### 使用starter方式
+
+1. **依赖**
+
+```java
+ <dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>druid-spring-boot-starter</artifactId>
+    <version>1.1.20</version>
+</dependency>
+```
+
+2. **增加配置**
+
+```java
+spring:
+  datasource:
+	 type: com.alibaba.druid.pool.DruidDataSource  #配置Druid连接池
+```
+
+3. 分析自动配置
+
+   - 扩展配置项 **spring.datasource.druid**
+
+   - `DruidSpringAopConfiguration.class`,  监控SpringBean的；配置项：`spring.datasource.druid.aop-patterns`
+
+   - `DruidStatViewServletConfiguration.class`, 监控页的配置：`spring.datasource.druid.stat-view-servlet`；默认开启
+
+   - `DruidWebStatFilterConfiguration.class`, web监控配置；`spring.datasource.druid.web-stat-filter`；默认开启
+
+   - `DruidFilterConfiguration.class` 所有Druid自己filter的配置
+
+   ```java
+   private static final String FILTER_CONFIG_PREFIX = "spring.datasource.druid.filter.config";
+   private static final String FILTER_ENCODING_PREFIX = "spring.datasource.druid.filter.encoding";
+   private static final String FILTER_SLF4J_PREFIX = "spring.datasource.druid.filter.slf4j";
+   private static final String FILTER_LOG4J_PREFIX = "spring.datasource.druid.filter.log4j";
+   private static final String FILTER_LOG4J2_PREFIX = "spring.datasource.druid.filter.log4j2";
+   private static final String FILTER_COMMONS_LOG_PREFIX = "spring.datasource.druid.filter.commons-log";
+   private static final String FILTER_WALL_PREFIX = "spring.datasource.druid.filter.wall";
+   ```
 
 **测试**
 
-	    @Test
-	    void contextLoads() throws SQLException {
-	        System.out.println(dataSource.getClass());	//class com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceWrapper
-	
-	        System.out.println(dataSource.getConnection());	//com.mysql.cj.jdbc.ConnectionImpl@34d52ecd
-	    }
+```java
+    @Test
+    void contextLoads() throws SQLException {
+        System.out.println(dataSource.getClass());	//class com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceWrapper
 
+        System.out.println(dataSource.getConnection());	//com.mysql.cj.jdbc.ConnectionImpl@34d52ecd
+    }
+```
 
-**增加Druid配置**
+系统中所有filter：
 
-	spring:
-	  datasource:
-	    username: root
-	    password: 123456
-	    url: jdbc:mysql://120.77.237.175:9306/springboot?serverTimezone=Asia/Shanghai
-	    driver-class-name: com.mysql.cj.jdbc.Driver
-	    #schema-*.sql、data-*.sql
-	    #默认规则：schema.sql，schema-all.sql；
-	    schema:
-	      - classpath:department.sql  #指定位置
-	    initialization-mode: always
-	
-	    type: com.alibaba.druid.pool.DruidDataSource  #配置Druid连接池
-	
-	    druid:
-	      # 连接池配置
-	      # 配置初始化大小、最小、最大
-	      initial-size: 1
-	      min-idle: 1
-	      max-active: 20
-	      # 配置获取连接等待超时的时间
-	      max-wait: 3000
-	      validation-query: SELECT 1 FROM DUAL
-	      test-on-borrow: false
-	      test-on-return: false
-	      test-while-idle: true
-	      pool-prepared-statements: true
-	      time-between-eviction-runs-millis: 60000
-	      min-evictable-idle-time-millis: 300000
-	      filters: stat,wall,slf4j
-	      # 配置web监控,默认配置也和下面相同(除用户名密码，enabled默认false外)，其他可以不配
-	      web-stat-filter:
-	        enabled: true
-	        url-pattern: /*
-	        exclusions: "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*"
-	      stat-view-servlet:
-	        enabled: true
-	        url-pattern: /druid/*
-	        login-username: admin
-	        login-password: root
-	        allow: 127.0.0.1
+| 别名          | Filter类名                                              |
+| ------------- | ------------------------------------------------------- |
+| default       | com.alibaba.druid.filter.stat.StatFilter                |
+| stat          | com.alibaba.druid.filter.stat.StatFilter                |
+| mergeStat     | com.alibaba.druid.filter.stat.MergeStatFilter           |
+| encoding      | com.alibaba.druid.filter.encoding.EncodingConvertFilter |
+| log4j         | com.alibaba.druid.filter.logging.Log4jFilter            |
+| log4j2        | com.alibaba.druid.filter.logging.Log4j2Filter           |
+| slf4j         | com.alibaba.druid.filter.logging.Slf4jLogFilter         |
+| commonlogging | com.alibaba.druid.filter.logging.CommonsLogFilter       |
 
-可访问Druid后台监控SQL
+**Druid示例配置**
+
+```java
+spring:
+  datasource:
+    username: *****
+    password: *****
+    url: jdbc:mysql://***.***.***.***:***/springboot?serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    #schema-*.sql、data-*.sql
+    #默认规则：schema.sql，schema-all.sql；
+    schema:
+      - classpath:department.sql  #指定位置
+    initialization-mode: always
+
+    type: com.alibaba.druid.pool.DruidDataSource  #配置Druid连接池
+
+   druid:
+      # 连接池配置
+      # 配置初始化大小、最小、最大
+      initial-size: 1
+      min-idle: 1
+      max-active: 20
+      # 配置获取连接等待超时的时间
+      max-wait: 3000
+      validation-query: SELECT 1 FROM DUAL
+      test-on-borrow: false
+      test-on-return: false
+      test-while-idle: true
+      pool-prepared-statements: true
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      filters: stat,wall,slf4j  #开启的功能 stat:sql监控 wall防火墙 ,各个功能的详细配置(默认使用内置配置),详细的配置如下为filter
+      filter: #对上面filters里面的各功能的详细配置
+        stat:
+          slow-sql-millis:  1000 #记录慢查询,当超过1000毫秒的
+          log-slow-sql: true
+          enabled: true
+        wall:
+          enabled: true
+          config:
+            delete-allow: false #不允许delete操作
+            drop-table-allow: false #不允许删除表
+
+      # 配置web监控,默认配置也和下面相同(除用户名密码，enabled默认false外)，其他可以不配
+      web-stat-filter:
+        enabled: true
+        url-pattern: /*
+        exclusions: "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*"
+      stat-view-servlet:  #配置监控页面
+        enabled: true #默认为false,是否开启servlet
+        url-pattern: /druid/*
+        login-username: admin   #配置监控页面登录的账号密码
+        login-password: admin
+        allow: 127.0.0.1
+        reset-enable: false #是否有重置
+      aop-patterns: com.springboot.data.jdbc.* # Spring监控AOP切入点，如x.y.z.service.*,配置多个英文逗号分隔
+```
+
+访问Druid后台监控url:	/druid
+
+SpringBoot配置示例
+
+https://github.com/alibaba/druid/tree/master/druid-spring-boot-starter
+
+配置项列表
+
+[https://github.com/alibaba/druid/wiki/DruidDataSource%E9%85%8D%E7%BD%AE%E5%B1%9E%E6%80%A7%E5%88%97%E8%A1%A8](https://github.com/alibaba/druid/wiki/DruidDataSource配置属性列表)
 
 
 ## 整合MyBatis ##
 
 ### 依赖 ###
 
-	 <dependency>
-	    <groupId>org.mybatis.spring.boot</groupId>
-	    <artifactId>mybatis-spring-boot-starter</artifactId>
-	    <version>2.1.2</version>
-	</dependency>
+```java
+ <dependency>
+    <groupId>org.mybatis.spring.boot</groupId>
+    <artifactId>mybatis-spring-boot-starter</artifactId>
+    <version>2.1.2</version>
+</dependency>
+```
 
 ### 依赖关系 ###
 
 ![](http://120.77.237.175:9080/photos/springboot/68.jpg)
+
+```java
+@org.springframework.context.annotation.Configuration
+@ConditionalOnClass({ SqlSessionFactory.class, SqlSessionFactoryBean.class })
+@ConditionalOnSingleCandidate(DataSource.class)
+@EnableConfigurationProperties(MybatisProperties.class)	//MyBatis配置项绑定类。
+@AutoConfigureAfter({ DataSourceAutoConfiguration.class, MybatisLanguageDriverAutoConfiguration.class })
+public class MybatisAutoConfiguration implements InitializingBean {
+	...
+}
+
+@ConfigurationProperties(prefix = MybatisProperties.MYBATIS_PREFIX)
+public class MybatisProperties {
+
+  public static final String MYBATIS_PREFIX = "mybatis";
+ 	...   
+}
+```
 
 ### 项目构建 ###
 
@@ -10495,193 +10654,219 @@ private List<Resource> getScripts(String propertyName, List<String> resources, S
 
 2. 添加Deparment和Employee实体类
 
-		public class Department {
-		    private Integer id;
-		    private String departmentName;
-		
-		    public Department(Integer id, String departmentName) {
-		        this.id = id;
-		        this.departmentName = departmentName;
-		    }
-		
-		    public Department() {
-		    }
-		
-		    public Integer getId() {
-		        return id;
-		    }
-		
-		    public void setId(Integer id) {
-		        this.id = id;
-		    }
-		
-		    public String getDepartmentName() {
-		        return departmentName;
-		    }
-		
-		    public void setDepartmentName(String departmentName) {
-		        this.departmentName = departmentName;
-		    }
-		
-		    @Override
-		    public String toString() {
-		        return "Department{" +
-		                "id=" + id +
-		                ", departmentName='" + departmentName + '\'' +
-		                '}';
-		    }
-		}
-
+	```java
+	public class Department {
+	    private Integer id;
+	    private String departmentName;
+	
+	    public Department(Integer id, String departmentName) {
+	        this.id = id;
+	        this.departmentName = departmentName;
+	    }
+	
+	    public Department() {
+	    }
+	
+	    public Integer getId() {
+	        return id;
+	    }
+	
+	    public void setId(Integer id) {
+	        this.id = id;
+	    }
+	
+	    public String getDepartmentName() {
+	        return departmentName;
+	    }
+	
+	    public void setDepartmentName(String departmentName) {
+	        this.departmentName = departmentName;
+	    }
+	
+	    @Override
+	    public String toString() {
+	        return "Department{" +
+	                "id=" + id +
+	                ", departmentName='" + departmentName + '\'' +
+	                '}';
+	    }
+}
+	```
+	
 	----
 
 
-		public class Employee {
-		    private Integer id;
-		    private String lastName;
-		    private String email;
-		    private Integer gender;
-		    private Integer d_id;
-		
-		    public Employee(Integer id, String lastName, String email, Integer gender, Integer d_id) {
-		        this.id = id;
-		        this.lastName = lastName;
-		        this.email = email;
-		        this.gender = gender;
-		        this.d_id = d_id;
-		    }
-		
-		    public Employee() {
-		    }
-		
-		    public Integer getId() {
-		        return id;
-		    }
-		
-		    public void setId(Integer id) {
-		        this.id = id;
-		    }
-		
-		    public String getLastName() {
-		        return lastName;
-		    }
-		
-		    public void setLastName(String lastName) {
-		        this.lastName = lastName;
-		    }
-		
-		    public String getEmail() {
-		        return email;
-		    }
-		
-		    public void setEmail(String email) {
-		        this.email = email;
-		    }
-		
-		    public Integer getGender() {
-		        return gender;
-		    }
-		
-		    public void setGender(Integer gender) {
-		        this.gender = gender;
-		    }
-		
-		    public Integer getD_id() {
-		        return d_id;
-		    }
-		
-		    public void setD_id(Integer d_id) {
-		        this.d_id = d_id;
-		    }
-		
-		    @Override
-		    public String toString() {
-		        return "Employee{" +
-		                "id=" + id +
-		                ", lastName='" + lastName + '\'' +
-		                ", email='" + email + '\'' +
-		                ", gender=" + gender +
-		                ", d_id=" + d_id +
-		                '}';
-		    }
+```java
+	public class Employee {
+	    private Integer id;
+	    private String lastName;
+	    private String email;
+	    private Integer gender;
+	    private Integer d_id;
+	
+	    public Employee(Integer id, String lastName, String email, Integer gender, Integer d_id) {
+	        this.id = id;
+	        this.lastName = lastName;
+	        this.email = email;
+	        this.gender = gender;
+	        this.d_id = d_id;
+	    }
+	
+	    public Employee() {
+	    }
+	
+	    public Integer getId() {
+	        return id;
+	    }
+	
+	    public void setId(Integer id) {
+	        this.id = id;
+	    }
+	
+	    public String getLastName() {
+	        return lastName;
+	    }
+	
+	    public void setLastName(String lastName) {
+	        this.lastName = lastName;
+	    }
+	
+	    public String getEmail() {
+	        return email;
+	    }
+	
+	    public void setEmail(String email) {
+	        this.email = email;
+	    }
+	
+	    public Integer getGender() {
+	        return gender;
+	    }
+	
+	    public void setGender(Integer gender) {
+	        this.gender = gender;
+	    }
+	
+	    public Integer getD_id() {
+	        return d_id;
+	    }
+	
+	    public void setD_id(Integer d_id) {
+	        this.d_id = d_id;
+	    }
+	
+	    @Override
+	    public String toString() {
+	        return "Employee{" +
+	                "id=" + id +
+	                ", lastName='" + lastName + '\'' +
+	                ", email='" + email + '\'' +
+	                ", gender=" + gender +
+	                ", d_id=" + d_id +
+	                '}';
+	    }
+```
 
 3. 配置数据源相关属性(可见前一节Druid)
 
-### Mybatis增删改查(注解版) ###
+### 注解模式 ###
+
+- 引入`mybatis-starter`
+
+- 配置`application.yaml`中，指定`mapper-location`位置即可
+
+- 编写`Mapper`接口并标注`@Mapper`注解
+
+- 简单方法直接注解方式
+
+- 复杂方法编写`mapper.xml`进行绑定映射
+
+- `@MapperScan("com.atguigu.admin.mapper")` 简化，其他的接口就可以不用标注`@Mapper`注解
 
 **Mapper**
 
-	@Mapper
-	public interface DepartmentMapper {
-	
-	    @Select("select * from department where id =#{id}")
-	    public Department getById(Integer id);
+```java
+@Mapper
+public interface DepartmentMapper {
 
+    @Select("select * from department where id =#{id}")
+    public Department getById(Integer id);
+    
+    @Options(useGeneratedKeys = true,keyProperty = "id")	//指定自增Key,添加数据后可返回其字段值
+   	@Insert("insert into department (departmentName) values (#{departmentName})")
+    public int add(Department department);
 
-​		
-​	    @Options(useGeneratedKeys = true,keyProperty = "id")	//指定自增Key,添加数据后可返回其字段值
-​	    @Insert("insert into department (departmentName) values (#{departmentName})")
-​	    public int add(Department department);
-​	
 ​	    @Update("update department set departmentName = #{departmentName} where id = #{id}")
 ​	    public  int update(Department department);
 ​	
 ​	    @Delete("delete department where id = #{id}")
 ​	    public int delete(Integer id);
 ​	}
+​
+```
 
 **Controller**
 
-	@RestController
-	public class DeptController {
-	
-	    @Autowired
-	    private DepartmentMapper departmentMapper;
+```java
+@RestController
+public class DeptController {
 
+    @Autowired
+    private DepartmentMapper departmentMapper;
+    
+    ​    	@GetMapping("/get/{id}")
+    ​	    public Department getDept(@PathVariable("id") Integer id){
+    ​	        return departmentMapper.getById(id);
+    ​	    }
+    ​	
+    ​	    @GetMapping("/add")
+    ​	    public Department addDept(Department department)
+    ​	    {
+    ​	         departmentMapper.add(department);
+    ​	         return department;
+    ​	    }
+}
 
-​	
-​	    @GetMapping("/get/{id}")
-​	    public Department getDept(@PathVariable("id") Integer id){
-​	        return departmentMapper.getById(id);
-​	    }
-​	
-​	    @GetMapping("/add")
-​	    public Department addDept(Department department)
-​	    {
-​	         departmentMapper.add(department);
-​	         return department;
-​	    }
-​	}
+```
 
-**测试**:
-
+	**测试**:
 	http://localhost:8080/dept/4						//{"id":4,"departmentName":"aaa"}
 	http://localhost:8080/dept?departmentName=aaa	//{"id":4,"departmentName":"aaa"}
 
-### Mybatis配置 ###
+### Mybatis全局配置 ###
 
 **开启驼峰命名法**
 
-	mybatis:
-	  configuration:
-	    map-underscore-to-camel-case: true
+```java
+#配置Mybatis规则
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true	#开启驼峰命名,注意不能和下面的全局配置文件共用,只能使用只中一种配置
+  config-location: classpath:/mybatis/mybatis.xml #指定全局配置文件的位置
+  mapper-locations: classpath:/mybatis/mapper/*.xml #指定sql映射文件的位置
+  
+  #可以不写全局配置文件，所有全局配置文件的配置都放在上面configuration配置项中即可
+```
 
 也可以通过向spring容器中注入**`org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer`**的方法设置`mybatis`参数
 
-	@Configuration
-	public class MybatisConfig {
-	
-	    @Bean
-	    public ConfigurationCustomizer mybatisConfigurationCustomizer()
-	    {
-	        return new ConfigurationCustomizer() {
-	            @Override
-	            public void customize(org.apache.ibatis.session.Configuration configuration) {
-	                configuration.setMapUnderscoreToCamelCase(true);
-	            }
-	        };
-	        
-	    }
-	}
+```java
+@Configuration
+public class MybatisConfig {
+
+    @Bean
+    public ConfigurationCustomizer mybatisConfigurationCustomizer()
+    {
+        return new ConfigurationCustomizer() {
+            @Override
+            public void customize(org.apache.ibatis.session.Configuration configuration) {
+                configuration.setMapUnderscoreToCamelCase(true);
+            }
+        };
+        
+    }
+}
+```
 
 
 通过看**`org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration`**发现
@@ -10694,40 +10879,55 @@ private List<Resource> getScripts(String propertyName, List<String> resources, S
 
 使用`@mapper`注解的类可以被扫描到容器中，但是每个`Mapper`都要加上这个注解就是一个繁琐的工作，能不能直接扫描某个包下的所有`Mapper`接口呢，当然可以，在springboot启动类上加上`@MapperScan`
 
-	@MapperScan("com.springboot.data.mybatis.springbootdatamybatis.mapper")
-	@SpringBootApplication
-	public class SpringbootDataMybatisApplication {
-	
-	    public static void main(String[] args) {
-	        SpringApplication.run(SpringbootDataMybatisApplication.class, args);
-	    }
-	
-	}
+```java
+@MapperScan("com.springboot.data.mybatis.springbootdatamybatis.mapper")
+@SpringBootApplication
+public class SpringbootDataMybatisApplication {
 
+    public static void main(String[] args) {
+        SpringApplication.run(SpringbootDataMybatisApplication.class, args);
+    }
 
-### 使用xml配置文件 ###
+}
+```
+
+### 配置模式 ###
+
+- 全局配置文件
+
+- `SqlSessionFactory`: 自动配置好了
+
+- `SqlSession`：自动配置了 `SqlSessionTemplate` 组合了`SqlSession`
+
+- `@Import(AutoConfiguredMapperScannerRegistrar.class）`；
+
+- `Mapper`： 只要我们写的操作MyBatis的接口标准了 `@Mapper` 就会被自动扫描进来
 
 1. 创建`mybatis`全局配置文件
 
-	<?xml version="1.0" encoding="UTF-8" ?>
-	<!DOCTYPE configuration
-	        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
-	        "http://mybatis.org/dtd/mybatis-3-config.dtd">
-	<configuration>
-	    <settings>
-			 <!--启驼峰命名自动映射-->
-	        <setting name="mapUnderscoreToCamelCase" value="true"/>
-	    </settings>
-	</configuration>
+  ```
+  <?xml version="1.0" encoding="UTF-8" ?>
+  ```
+
+  <!DOCTYPE configuration
+          PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+          "http://mybatis.org/dtd/mybatis-3-config.dtd">
+  <configuration>
+      <settings>
+  		 <!--启驼峰命名自动映射-->
+          <setting name="mapUnderscoreToCamelCase" value="true"/>
+      </settings>
+  </configuration>
 
 2. 创建`EmployeeMapper`接口
 
-	public interface EmployeeMapper {
-
-	    public List<Employee> getAll();
-	    
-	    public Employee getById(Integer id);
-	}
+  ```java
+  public interface EmployeeMapper {
+      public List<Employee> getAll();
+  
+      public Employee getById(Integer id);
+  }
+  ```
 
 3. 创建`EmployeeMapper.xml`映射文件
 
@@ -10749,20 +10949,22 @@ private List<Resource> getScripts(String propertyName, List<String> resources, S
 
 5. 创建`EmpController`
 
-		@RestController
-		public class EmpController {
-		
-		    @Autowired
-		    private EmployeeMapper employeeMapper;
-		
-		    @GetMapping("/emp/{id}")
-		    public Employee getEmpById(@PathVariable("id") Integer id){
-		        return employeeMapper.getById(id);
-				/**
-					{"id":1,"lastName":"张三","email":"test@test.com","gender":1,"d_id":1}****
-				**/
-		    }
-		}
+	```java
+	@RestController
+	public class EmpController {
+	
+	    @Autowired
+	    private EmployeeMapper employeeMapper;
+	
+	    @GetMapping("/emp/{id}")
+	    public Employee getEmpById(@PathVariable("id") Integer id){
+	        return employeeMapper.getById(id);
+			/**
+				{"id":1,"lastName":"张三","email":"test@test.com","gender":1,"d_id":1}****
+			**/
+	    }
+	}
+	```
 
 # 整合SpringData JPA #
 
@@ -11697,7 +11899,7 @@ private SpringApplicationRunListeners getRunListeners(String[] args) {
   }
   ```
 
-  ----
+----
 
   ```java
   public class TestSpringApplicationRunListener implements SpringApplicationRunListener {

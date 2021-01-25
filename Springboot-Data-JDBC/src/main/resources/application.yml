@@ -27,15 +27,28 @@ spring:
       pool-prepared-statements: true
       time-between-eviction-runs-millis: 60000
       min-evictable-idle-time-millis: 300000
-      filters: stat,wall,slf4j
+      filters: stat,wall,slf4j  #开启的功能 stat:sql监控 wall防火墙 ,各个功能的详细配置(默认使用内置配置),详细的配置如下为filter
+      filter: #对上面filters里面的各功能的详细配置
+        stat:
+          slow-sql-millis:  1000 #记录慢查询,当超过1000毫秒的
+          log-slow-sql: true
+          enabled: true
+        wall:
+          enabled: true
+          config:
+            delete-allow: false #不允许delete操作
+            drop-table-allow: false #不允许删除表
+
       # 配置web监控,默认配置也和下面相同(除用户名密码，enabled默认false外)，其他可以不配
       web-stat-filter:
         enabled: true
         url-pattern: /*
         exclusions: "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*"
-      stat-view-servlet:
-        enabled: true
+      stat-view-servlet:  #配置监控页面
+        enabled: true #默认为false,是否开启servlet
         url-pattern: /druid/*
-        login-username: admin
+        login-username: admin   #配置监控页面登录的账号密码
         login-password: admin
         allow: 127.0.0.1
+        reset-enable: false #是否有重置
+      aop-patterns: com.springboot.data.jdbc.* # Spring监控AOP切入点，如x.y.z.service.*,配置多个英文逗号分隔
