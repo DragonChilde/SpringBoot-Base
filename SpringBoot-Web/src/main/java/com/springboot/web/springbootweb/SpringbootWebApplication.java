@@ -11,21 +11,20 @@ import java.util.Locale;
 @SpringBootApplication
 public class SpringbootWebApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(SpringbootWebApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(SpringbootWebApplication.class, args);
+  }
 
-    @Bean
-    public ViewResolver myViewReolver()
-    {
-        return new MyViewResolver();
-    }
+  @Bean
+  public ViewResolver myViewReolver() {
+    return new MyViewResolver();
+  }
 
-    private static class MyViewResolver implements  ViewResolver{
+  private static class MyViewResolver implements ViewResolver {
 
-        @Override
-        public View resolveViewName(String s, Locale locale) throws Exception {
-            return null;
-        }
+    @Override
+    public View resolveViewName(String s, Locale locale) throws Exception {
+      return null;
     }
+  }
 }

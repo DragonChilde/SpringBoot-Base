@@ -15,13 +15,11 @@ import java.util.HashMap;
 @Controller
 public class HelloController {
 
-    @RequestMapping("/success")
-    public String success(Model model)
-    {
-       model.addAttribute("hello","<h1>你好</h1>");
-       model.addAttribute("users", Arrays.asList("张三","李四","王五"));
+  @RequestMapping("/success")
+  public String success(Model model) {
+    model.addAttribute("hello", "<h1>你好</h1>");
+    model.addAttribute("users", Arrays.asList("张三", "李四", "王五"));
 
-        return "success";
-    }
-
+    return "success";
+  }
 }

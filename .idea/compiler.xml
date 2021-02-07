@@ -10,20 +10,23 @@
         <module name="springboot-starter" />
         <module name="springboot-web-jsp" />
         <module name="springboot-starter-define-configure" />
-        <module name="springboot-loggin" />
-        <module name="springboot-data-jdbc" />
-        <module name="springboot-helloworld-quick" />
+        <module name="SpringBoot-Mybatisplus" />
         <module name="springboot-web-restful" />
+        <module name="springboot-helloworld-quick" />
+        <module name="SpringBoot-MybatisPlus" />
         <module name="springboot-starter-define" />
         <module name="SpringBoot-Helloworld" />
         <module name="springboot-data-jpa" />
         <module name="springboot-web" />
+        <module name="springboot-data-jdbc" />
         <module name="springboot-config" />
         <module name="SpringBoot-thymeleaf" />
+        <module name="SpringBoot-Junit5" />
         <module name="springboot-annotation" />
         <module name="springboot-config02" />
         <module name="springboot-data-mybatis" />
         <module name="springboot-Web02" />
+        <module name="springboot-loggin" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="8">
@@ -36,7 +39,10 @@
       <module name="springboot-data-mybatis" target="1.8" />
       <module name="SpringBoot-Helloworld" target="1.8" />
       <module name="springboot-helloworld-quick" target="1.8" />
+      <module name="SpringBoot-Junit5" target="1.8" />
       <module name="springboot-loggin" target="1.8" />
+      <module name="SpringBoot-Mybatisplus" target="1.8" />
+      <module name="SpringBoot-MybatisPlus" target="1.8" />
       <module name="springboot-starter" target="1.8" />
       <module name="springboot-starter-define" target="1.8" />
       <module name="springboot-starter-define-configure" target="1.8" />
@@ -50,6 +56,9 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="SpringBoot-Helloworld" options="-parameters" />
+      <module name="SpringBoot-Junit5" options="-parameters" />
+      <module name="SpringBoot-MybatisPlus" options="-parameters" />
+      <module name="SpringBoot-Mybatisplus" options="-parameters" />
       <module name="SpringBoot-thymeleaf" options="-parameters" />
       <module name="springboot-Web02" options="-parameters" />
       <module name="springboot-annotation" options="-parameters" />

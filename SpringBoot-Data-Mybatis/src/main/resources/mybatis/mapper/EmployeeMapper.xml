@@ -5,5 +5,5 @@
 <mapper namespace="com.springboot.data.mybatis.springbootdatamybatis.mapper.EmployeeMapper">
     <select id="getById" resultType="com.springboot.data.mybatis.springbootdatamybatis.entity.Employee">
         select * from employee where id = #{id}
-  </select>
+    </select>
 </mapper>

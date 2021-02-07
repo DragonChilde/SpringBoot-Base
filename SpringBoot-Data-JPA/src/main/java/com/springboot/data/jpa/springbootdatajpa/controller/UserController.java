@@ -12,13 +12,11 @@ import java.util.Optional;
 @RestController
 public class UserController {
 
-    @Autowired
-    private UserRepository userRepository;
+  @Autowired private UserRepository userRepository;
 
-    @GetMapping("/user/{id}")
-    public User getUserById(@PathVariable("id") Integer id){
-        Optional<User> user = userRepository.findById(id);
-        return user.get();
-
-    }
+  @GetMapping("/user/{id}")
+  public User getUserById(@PathVariable("id") Integer id) {
+    Optional<User> user = userRepository.findById(id);
+    return user.get();
+  }
 }

@@ -11,13 +11,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class HelloController {
 
-    @Value("${person.name}")
-    private String name;
+  @Value("${person.name}")
+  private String name;
 
-    @RequestMapping("hello")
-    public String hello()
-    {
-        return  "Hello "+this.name;
-    }
-
+  @RequestMapping("hello")
+  public String hello() {
+    return "Hello " + this.name;
+  }
 }

@@ -13,7 +13,7 @@ import org.springframework.context.annotation.ComponentScan;
 @EnableAutoConfiguration
 @ComponentScan("com.sb.annotation")
 // 上面三个注解的作用等同于@SpringBootApplication
-//@SpringBootApplication
+// @SpringBootApplication
 public class AnnotationApplication {
 
   public static void main(String[] args) {
@@ -53,8 +53,8 @@ public class AnnotationApplication {
 
     boolean haha = run.containsBean("haha");
     boolean hehe = run.containsBean("hehe");
-    System.out.println("haha: "+haha);
-    System.out.println("hehe: "+hehe);
+    System.out.println("haha: " + haha);
+    System.out.println("hehe: " + hehe);
 
     Car car = run.getBean(Car.class);
     System.out.println(car);

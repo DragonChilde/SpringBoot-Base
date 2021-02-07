@@ -10966,7 +10966,7 @@ public class SpringbootDataMybatisApplication {
 	}
 	```
 
-# 整合SpringData JPA #
+## 整合SpringData JPA ##
 
 
 ![](http://120.77.237.175:9080/photos/springboot/71.png)
@@ -11041,6 +11041,203 @@ public class SpringbootDataMybatisApplication {
 				**/
 		    }
 		}
+	
+	
+## 整合Mybatis-Plus
+
+```java
+  <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-boot-starter</artifactId>
+      <version>3.4.2</version>
+  </dependency>
+```
+
+点击`mybatis-plus-boot-starter`进去可以看到已经默认为我们加载了`mybatis`和`jdbc`的包所以不再需要引入以下两个包
+
+```java
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+<dependency>
+    <groupId>com.baomidou</groupId>
+    <artifactId>mybatis-plus-boot-starter</artifactId>
+</dependency>
+```
+
+### 自动配置
+
+```java
+com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration
+```
+
+- `MybatisPlusAutoConfiguration` 配置类，`MybatisPlusProperties `配置项绑定。**`mybatis-plus`：xxx 就是对`mybatis-plus`的定制**
+
+- **`SqlSessionFactory` 自动配置好。底层是容器中默认的数据源**
+
+- **`mapperLocations` 自动配置好的。有默认值。**`classpath\*:/mapper/\**/\*.xml；`任意包的类路径下的所有`mapper`文件夹下任意路径下的所有`xml`都是`sql`映射文件。  **建议以后sql映射文件，放在 `mapper`下**
+
+- **容器中也自动配置好了** **`SqlSessionTemplate`**
+
+- **``@Mapper` 标注的接口也会被自动扫描；建议直接** `@MapperScan("com.sb.mybatisplus.mapper")` 批量扫描就行
+
+### 测试
+
+**Bean**
+
+```java
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+@ToString
+@TableName("user")  //指定表名
+public class User {
+
+    /**
+     * 所有属性都应该在数据库中
+     */
+    @TableField(exist = false)  //当前属性表中不存在
+    private String userName;
+    @TableField(exist = false)
+    private String password;
+
+    //以下是数据库字段
+    @TableId(type = IdType.AUTO)    //主键注解,数据库ID自增
+    private Long id;
+    private String lastName;
+    private String email;
+}
+```
+
+**Mapper**
+
+```java
+public interface UserMapper extends BaseMapper<User> {
+}
+```
+
+Test
+
+```java
+@SpringBootTest
+class MybatisplusApplicationTests {
+
+  @Autowired
+  private UserMapper userMapper;
+
+  @Test
+  void contextLoads() {
+
+    User user = userMapper.selectById(1L);
+    System.out.println(user);	//User(userName=null, password=null, id=1, lastName=李四, email=test@test.com)
+
+  }
+}
+```
+
+### CRUD
+
+只需要我们的Mapper继承 **BaseMapper** 就可以拥有crud能力
+
+**Service**
+
+```java
+public interface UserService extends IService<User> {}
+```
+
+**ServiceImpl**
+
+```java
+@Service
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {}
+```
+
+**Controller**
+
+```java
+@RestController
+public class TestController {
+
+    @Autowired
+    private UserService userService;
+
+    @RequestMapping("/mp/test")
+    public String testSql()
+    {
+        List<User> list = userService.list();
+        return list.toString();
+        //[User(userName=null, password=null, id=1, lastName=李四, email=test@test.com), User(userName=null, password=null, id=2, lastName=张三, email=zhangsan@test.com)]
+    }
+    
+    @RequestMapping("/mp/create")
+    public void testSqlCreate(User user)
+    {
+        boolean insert = userService.save(user);
+        System.out.println(insert);
+    }
+
+    @RequestMapping("/mp/update")
+    public void testSqlUpdate(User user)
+    {
+        boolean update = userService.updateById(user);
+        System.out.println(update);
+    }
+
+    @RequestMapping("/mp/del")
+    public void testSqlDel(@RequestParam("id") Long id)
+    {
+        boolean del = userService.removeById(id);
+        System.out.println(del);
+    }
+}
+```
+
+### 分面插件
+
+**配置类**
+
+```java
+/**
+ * 注意: MybatisPlus3.4以上版本使用的是MybatisPlusInterceptor拦截器
+ */
+@Configuration
+public class MpConfig {
+    @Bean
+    public MybatisPlusInterceptor paginationInterceptor() {
+        MybatisPlusInterceptor mybatisPlusInterceptor = new MybatisPlusInterceptor();
+        // 设置请求的页面大于最大页后操作， true调回到首页，false 继续请求  默认false
+        // paginationInterceptor.setOverflow(false);
+        // 设置最大单页限制数量，默认 500 条，-1 不受限制
+        // paginationInterceptor.setLimit(500);
+        // 开启 count 的 join 优化,只针对部分 left join
+        PaginationInnerInterceptor paginationInnerInterceptor = new PaginationInnerInterceptor();
+        mybatisPlusInterceptor.addInnerInterceptor(paginationInnerInterceptor);
+
+        return mybatisPlusInterceptor;
+    }
+}
+```
+
+**Controller**
+
+```java
+    @RequestMapping("/mp/page")
+    public String testSqlPage(@RequestParam("current") Integer current, @RequestParam("limit") Integer limit) {
+        Page<User> page = new Page<>(current, limit);
+        Page<User> userPage = userService.page(page, null);
+        long pageCurrent = userPage.getCurrent();   //当前页
+        long total = userPage.getTotal();   //总数据
+        long pages = userPage.getPages();   //总页数
+        System.out.println(pageCurrent);
+        System.out.println(total);
+        System.out.println(pages);
+        return userPage.getRecords().toString();    //当开启分页插件时,数据从这里获取
+    }
+
+```
+
+
 
 # SpringBoot原理 #
 
@@ -12311,4 +12508,314 @@ org.springframework.boot.autoconfigure.aop.AopAutoConfiguration,\
     }
     ```
 
-    
+# 单元测试
+
+## JUnit5 的变化
+
+作为最新版本的`JUnit`框架，`JUnit5`与之前版本的`Junit`框架有很大的不同。由三个不同子项目的几个不同模块组成。
+
+> **JUnit 5 = JUnit Platform + JUnit Jupiter + JUnit Vintage**
+
+**JUnit Platform**: `Junit Platform`是在JVM上启动测试框架的基础，不仅支持`Junit`自制的测试引擎，其他测试引擎也都可以接入。
+
+**JUnit Jupiter**: `JUnit Jupiter`提供了JUnit5的新的编程模型，是`JUnit5`新特性的核心。内部 包含了一个**测试引擎**，用于在`Junit Platform`上运行。
+
+**JUnit Vintage**: 由于`JUint`已经发展多年，为了照顾老的项目，`JUnit Vintage`提供了兼容`JUnit4.x`,`Junit3.x`的测试引擎。
+
+![](http://120.77.237.175:9080/photos/springboot/129.jpg)
+
+**注意：**
+
+> **SpringBoot 2.4 以上版本移除了默认对 Vintage 的依赖。如果需要兼容junit4需要自行引入（不能使用junit4的功能 @Test）**
+>
+> **JUnit 5’s Vintage Engine Removed from** **`spring-boot-starter-test,如果需要继续兼容junit4需要自行引入vintage`**
+
+```java
+<!--兼容Juit4-->
+<dependency>
+    <groupId>org.junit.vintage</groupId>
+    <artifactId>junit-vintage-engine</artifactId>
+    <scope>test</scope>
+    <exclusions>
+        <exclusion>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-core</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+```
+
+如果不考虑Juit4以前的兼容问题,直接以下就好了
+
+```java
+ <dependency>
+ 	<groupId>org.springframework.boot</groupId>
+     <artifactId>spring-boot-starter-test</artifactId>
+     <scope>test</scope>
+</dependency>
+```
+
+现在的版本
+
+```java
+@SpringBootTest
+class Junit5ApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+}
+```
+
+以前：
+
+```
+@SpringBootTest + @RunWith(SpringTest.class)
+```
+
+SpringBoot整合Junit以后。
+
+- 编写测试方法：`@Test`标注（注意需要使用junit5版本的注解）
+- `Junit`类具有`Spring`的功能，`@Autowired`、比如 `@Transactional` 标注测试方法，测试完成后自动回滚
+
+## JUnit5常用注解
+
+JUnit5的注解与JUnit4的注解有所变化
+
+https://junit.org/junit5/docs/current/user-guide/#writing-tests-annotations
+
+- **@Test :**表示方法是测试方法。但是与JUnit4的@Test不同，他的职责非常单一不能声明任何属性，拓展的测试将会由Jupiter提供额外测试
+- **@ParameterizedTest :**表示方法是参数化测试，下方会有详细介绍
+- **@RepeatedTest :**表示方法可重复执行，下方会有详细介绍
+- **@DisplayName :**为测试类或者测试方法设置展示名称
+- **@BeforeEach :**表示在每个单元测试之前执行
+- **@AfterEach :**表示在每个单元测试之后执行
+- **@BeforeAll :**表示在所有单元测试之前执行
+- **@AfterAll :**表示在所有单元测试之后执行
+- **@Tag :**表示单元测试类别，类似于`JUnit4`中的`@Categories`
+- **@Disabled :**表示测试类或测试方法不执行，类似于`JUnit4`中的`@Ignore`
+- **@Timeout :**表示测试方法运行如果超过了指定时间将会返回错误
+- **@ExtendWith :**为测试类或测试方法提供扩展类引用
+
+```java
+package com.sb.junit5;
+
+import org.junit.jupiter.api.*;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.concurrent.TimeUnit;
+
+@DisplayName("junit5功能测试类")
+/**
+ * @SpringBootTest注解使用了spring的驱动进行测试,因此可以使用@Autowired进行注入
+ * @BootstrapWith(SpringBootTestContextBootstrapper.class)
+ * @ExtendWith({SpringExtension.class})
+ */
+@SpringBootTest
+class Junit5ApplicationTests {
+
+
+    @DisplayName("测试testDisplayName()") //标注测试名称
+    @Test
+    void testDisplayName()
+    {
+        System.out.println("this is display name");
+    }
+
+    /**
+     * 所有测试方法前都执行一次
+     */
+    @BeforeEach
+    void testBeforeEach()
+    {
+        System.out.println("test is starting");
+    }
+
+    /**
+     * 所有测试方法后都执行一次
+     */
+    @AfterEach
+    void testAfterEach()
+    {
+        System.out.println("test is ending");
+    }
+
+
+    @Disabled   //该测试方法不行执
+    @DisplayName("test01")
+    @Test
+    void test01()
+    {
+        System.out.println("this is test01");
+    }
+
+    /**
+     * 在该测试类最后执行一次
+     */
+    @AfterAll
+    static void testAfterAll()
+    {
+        System.out.println("test after all is ending");
+    }
+
+    /**
+     * 在该测试类前执行一次
+     */
+    @BeforeAll
+    static void testBeforeAll()
+    {
+        System.out.println("test before all is starting");
+    }
+
+    /**
+     * 规定方法超时时间。超出时间测试出异常
+     * @throws InterruptedException
+     */
+    @Test
+    @Timeout(value = 500,unit = TimeUnit.MILLISECONDS)
+    void testTimeOut() throws InterruptedException
+    {
+        Thread.sleep(600);
+    }
+
+    /**
+     * 重复测试该方法3次
+     */
+    @RepeatedTest(3)
+    void testRepeatedTest()
+    {
+        System.out.println(1);
+    }
+}
+
+```
+
+## 断言（assertions）
+
+断言（assertions）是测试方法中的核心部分，用来对测试需要满足的条件进行验证。**这些断言方法都是 org.junit.jupiter.api.Assertions 的静态方法**。JUnit 5 内置的断言可以分成如下几个类别：
+
+**检查业务逻辑返回的数据是否合理。所有的测试运行结束以后，会有一个详细的测试报告；**
+
+### 简单断言
+
+| 方法            | 说明                                 |
+| --------------- | ------------------------------------ |
+| assertEquals    | 判断两个对象或两个原始类型是否相等   |
+| assertNotEquals | 判断两个对象或两个原始类型是否不相等 |
+| assertSame      | 判断两个对象引用是否指向同一个对象   |
+| assertNotSame   | 判断两个对象引用是否指向不同的对象   |
+| assertTrue      | 判断给定的布尔值是否为 true          |
+| assertFalse     | 判断给定的布尔值是否为 false         |
+| assertNull      | 判断给定的对象引用是否为 null        |
+| assertNotNull   | 判断给定的对象引用是否不为 null      |
+
+```java
+@SpringBootTest
+public class AssertionsTests {
+
+     /**
+     * 断言：前面断言失败，后面的代码都不会执行
+     */
+    @DisplayName("test simple assertions")
+    @Test
+    void testSimpleAssertions(){
+        int cal = cal(3, 3);
+         //assertEquals()是静态方法,可以直接使用
+       	assertEquals(5,cal,"逻辑计算失败");
+        /**
+        org.opentest4j.AssertionFailedError: 逻辑计算失败 ==> 
+        预期:5
+        实际:6
+        **/
+        Object obj1 = new Object();
+        Object obj2 = new Object();
+
+        assertSame(obj1,obj2,"objs is not same");
+        /**
+        org.opentest4j.AssertionFailedError: objs is not same ==> 
+        预期:java.lang.Object@1b62629
+        实际:java.lang.Object@53bb6f
+        **/
+    }
+
+    int cal(int i ,int j){
+        return i + j;
+    }
+}
+```
+
+### 数组断言
+
+通过 `assertArrayEquals` 方法来判断两个对象或原始类型的数组是否相等
+
+```java
+@DisplayName("array assertion")
+@Test
+void testArrayAssert() {
+    assertArrayEquals(new int[]{2, 1}, new int[]{1, 2},"数组不相等");
+    //org.opentest4j.AssertionFailedError: 数组不相等 ==> array contents differ at index [0], expected: <2> but was: <1>
+}
+```
+
+> **注意:当断言为真的时候不会有任何返回,直接执行成功**
+
+### 组合断言
+
+`assertAll` 方法接受多个 `org.junit.jupiter.api.Executable` 函数式接口的实例作为要验证的断言，可以通过 `lambda` 表达式很容易的提供这些断言
+
+```java
+    @DisplayName("组合断言")
+    @Test
+    void testAllAssert() {
+        assertAll("test",
+                () -> assertTrue(true && true, "结果为ture"),
+                () -> assertEquals(1, 2, "结果不相等")
+        );
+    }
+```
+
+### 异常断言
+
+在`JUnit4`时期，想要测试方法的异常情况时，需要用**`@Rule`**注解的`ExpectedException`变量还是比较麻烦的。而`JUnit5`提供了一种新的断言方式**Assertions.assertThrows()** ,配合函数式编程就可以进行使用。
+
+```java
+    /**断言方法必定会抛异常,如果执行正确不抛异常,会抛出异常断言**/
+	@DisplayName("异常断言")
+    @Test
+    void testExceptionAssert() {
+        assertThrows(ArithmeticException.class,
+                () -> {
+                    int i = 10 / 2;
+                },
+                "业务计算正确"
+        );
+    }
+```
+
+### 超时断言
+
+`Junit5`还提供了**`Assertions.assertTimeout()`** 为测试方法设置了超时时间
+
+```java
+    @Test
+    @DisplayName("超时测试")
+    public void timeoutTest() {
+        //如果测试方法时间超过500mx将会异常
+        assertTimeout(Duration.ofMillis(500),()->Thread.sleep(1000),"超时");
+        //org.opentest4j.AssertionFailedError: 超时 ==> execution exceeded timeout of 500 ms by 500 ms
+    }
+```
+
+### 快速失败
+
+通过 fail 方法直接使得测试失败
+
+```java
+    @Test
+    @DisplayName("fail")
+    public void shouldFail() {
+       if ( 1 == 2){
+           fail("this fail");
+       }
+    }
+```

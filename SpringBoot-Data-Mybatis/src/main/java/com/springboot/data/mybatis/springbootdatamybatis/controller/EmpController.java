@@ -10,11 +10,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class EmpController {
 
-    @Autowired
-    private EmployeeMapper employeeMapper;
+  @Autowired private EmployeeMapper employeeMapper;
 
-    @GetMapping("/emp/{id}")
-    public Employee getEmpById(@PathVariable("id") Integer id){
-        return employeeMapper.getById(id);
-    }
+  @GetMapping("/emp/{id}")
+  public Employee getEmpById(@PathVariable("id") Integer id) {
+    return employeeMapper.getById(id);
+  }
 }

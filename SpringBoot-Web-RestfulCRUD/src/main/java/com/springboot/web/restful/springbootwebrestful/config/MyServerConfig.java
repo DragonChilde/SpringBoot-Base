@@ -17,43 +17,34 @@ import java.util.Arrays;
 @Configuration
 public class MyServerConfig {
 
-    //配置嵌入式的Servlet容器
-    @Bean
-    public WebServerFactoryCustomizer webServerFactoryCustomizer()
-    {
-        //定制嵌入式的Servlet容器相关的规则
-        return new WebServerFactoryCustomizer<ConfigurableWebServerFactory>() {
-            @Override
-            public void customize(ConfigurableWebServerFactory factory) {
-                factory.setPort(8081);
-            }
-        };
+  // 配置嵌入式的Servlet容器
+  @Bean
+  public WebServerFactoryCustomizer webServerFactoryCustomizer() {
+    // 定制嵌入式的Servlet容器相关的规则
+    return new WebServerFactoryCustomizer<ConfigurableWebServerFactory>() {
+      @Override
+      public void customize(ConfigurableWebServerFactory factory) {
+        factory.setPort(8081);
+      }
+    };
+  }
 
-    }
+  // 注册三大组件
+  @Bean
+  public ServletRegistrationBean myServlet() {
+    return new ServletRegistrationBean(new MyServlet(), "/myServlet");
+  }
 
-    //注册三大组件
-    @Bean
-    public ServletRegistrationBean myServlet()
-    {
-        return new ServletRegistrationBean(new MyServlet(), "/myServlet");
+  @Bean
+  public FilterRegistrationBean myFilter() {
+    FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean();
+    filterRegistrationBean.setFilter(new MyFilter());
+    filterRegistrationBean.setUrlPatterns(Arrays.asList("/myFilter"));
+    return filterRegistrationBean;
+  }
 
-    }
-
-    @Bean
-    public FilterRegistrationBean myFilter()
-    {
-        FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean();
-        filterRegistrationBean.setFilter(new MyFilter());
-        filterRegistrationBean.setUrlPatterns(Arrays.asList("/myFilter"));
-        return filterRegistrationBean;
-    }
-
-
-    @Bean
-    public ServletListenerRegistrationBean myListener()
-    {
-        return new ServletListenerRegistrationBean<>(new MyListener());
-
-    }
-
+  @Bean
+  public ServletListenerRegistrationBean myListener() {
+    return new ServletListenerRegistrationBean<>(new MyListener());
+  }
 }

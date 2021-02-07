@@ -4,10 +4,9 @@ import com.springboot.data.mybatis.springbootdatamybatis.entity.Employee;
 
 import java.util.List;
 
-
 public interface EmployeeMapper {
 
-    public List<Employee> getAll();
+  public List<Employee> getAll();
 
-    public Employee getById(Integer id);
+  public Employee getById(Integer id);
 }

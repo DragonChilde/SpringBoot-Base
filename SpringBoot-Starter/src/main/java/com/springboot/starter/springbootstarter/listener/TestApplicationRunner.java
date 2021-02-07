@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 @Order(1)
 @Component
 public class TestApplicationRunner implements ApplicationRunner {
-    @Override
-    public void run(ApplicationArguments args) throws Exception {
-        System.out.println("TestApplicationRunner ..."+args);
-    }
+  @Override
+  public void run(ApplicationArguments args) throws Exception {
+    System.out.println("TestApplicationRunner ..." + args);
+  }
 }

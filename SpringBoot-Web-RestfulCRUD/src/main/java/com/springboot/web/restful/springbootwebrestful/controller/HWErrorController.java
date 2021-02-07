@@ -10,15 +10,12 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 public class HWErrorController {
 
-    /*1、浏览器客户端返回的都是json*/
-    @GetMapping("/hello")
-    public String error(@RequestParam("user")String user)
-    {
-        if (user.equals("aaa"))
-        {
-            throw new UserNotExistException();
-        }
-        return "HELLO WORLD";
+  /*1、浏览器客户端返回的都是json*/
+  @GetMapping("/hello")
+  public String error(@RequestParam("user") String user) {
+    if (user.equals("aaa")) {
+      throw new UserNotExistException();
     }
-
+    return "HELLO WORLD";
+  }
 }

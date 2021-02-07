@@ -9,30 +9,24 @@ import org.springframework.validation.annotation.Validated;
 
 import javax.validation.Valid;
 
-
 @SpringBootTest
 class SpringbootConfigApplicationTests {
 
-    @Autowired
-    private Person person;
+  @Autowired private Person person;
 
-    @Autowired
-    private ApplicationContext ioc;
-    @Test
-    public void contextLoads() {
-    }
+  @Autowired private ApplicationContext ioc;
 
-    @Test
-    public void testPersonConfig()
-    {
+  @Test
+  public void contextLoads() {}
 
-        System.out.println(person);
-    }
+  @Test
+  public void testPersonConfig() {
 
-    @Test
-    public void testHello()
-    {
-        System.out.println(ioc.containsBean("hello02"));
-    }
+    System.out.println(person);
+  }
 
+  @Test
+  public void testHello() {
+    System.out.println(ioc.containsBean("hello02"));
+  }
 }

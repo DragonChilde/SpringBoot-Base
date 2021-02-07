@@ -22,6 +22,8 @@
         <option value="$PROJECT_DIR$/springboot-annotation/pom.xml" />
         <option value="$PROJECT_DIR$/springboot-Web02/pom.xml" />
         <option value="$PROJECT_DIR$/SpringBoot-thymeleaf/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-MybatisPlus/pom.xml" />
+        <option value="$PROJECT_DIR$/SpringBoot-Junit5/pom.xml" />
       </list>
     </option>
   </component>

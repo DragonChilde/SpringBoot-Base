@@ -11,10 +11,7 @@ import java.util.Locale;
 @SpringBootApplication
 public class SpringbootWebRestfulApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(SpringbootWebRestfulApplication.class, args);
-    }
-
-
-
+  public static void main(String[] args) {
+    SpringApplication.run(SpringbootWebRestfulApplication.class, args);
+  }
 }

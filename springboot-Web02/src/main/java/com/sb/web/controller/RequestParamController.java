@@ -74,13 +74,13 @@ public class RequestParamController {
 
   /**
    * 数据绑定：页面提交的请求数据（GET、POST）都可以和对象属性进行绑定
+   *
    * @param person
    * @return
    */
   @PostMapping("/saveuser")
-  public Person saveuser(Person person){
+  public Person saveuser(Person person) {
 
     return person;
   }
-
 }

@@ -85,8 +85,6 @@
     <orderEntry type="library" name="Maven: org.springframework:spring-jcl:5.3.1" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.springframework:spring-test:5.3.1" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.xmlunit:xmlunit-core:2.7.0" level="project" />
-    <orderEntry type="module" module-name="springboot-starter-define" />
-    <orderEntry type="module" module-name="springboot-starter-define-configure" />
-    <orderEntry type="library" name="Maven: org.projectlombok:lombok:1.18.16" level="project" />
+    <orderEntry type="library" name="Maven: com.springboot.starter.define:springboot-starter-define:1.0-SNAPSHOT" level="project" />
   </component>
 </module>

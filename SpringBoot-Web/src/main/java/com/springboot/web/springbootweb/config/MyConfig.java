@@ -11,14 +11,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter
  * @author Lee
  * @create 2020/4/22 14:27
  */
-//使用WebMvcConfigurer可以来扩展SpringMVC的功能
+// 使用WebMvcConfigurer可以来扩展SpringMVC的功能
 @EnableWebMvc
 @Configuration
 public class MyConfig implements WebMvcConfigurer {
-    @Override
-    public void addViewControllers(ViewControllerRegistry registry) {
-        // super.addViewControllers(registry);
-        //浏览器发送 /atguigu 请求来到 success
-        registry.addViewController("/hello").setViewName("success");
-    }
+  @Override
+  public void addViewControllers(ViewControllerRegistry registry) {
+    // super.addViewControllers(registry);
+    // 浏览器发送 /atguigu 请求来到 success
+    registry.addViewController("/hello").setViewName("success");
+  }
 }

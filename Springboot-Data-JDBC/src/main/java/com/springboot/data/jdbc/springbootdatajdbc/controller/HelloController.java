@@ -12,14 +12,12 @@ import java.util.Map;
 @Controller
 public class HelloController {
 
-    @Autowired
-    JdbcTemplate jdbcTemplate;
+  @Autowired JdbcTemplate jdbcTemplate;
 
-    @ResponseBody
-    @GetMapping("/query")
-    public Map<String, Object> query()
-    {
-        List<Map<String, Object>> maps = jdbcTemplate.queryForList("select * from department");
-        return maps.get(0);
-    }
+  @ResponseBody
+  @GetMapping("/query")
+  public Map<String, Object> query() {
+    List<Map<String, Object>> maps = jdbcTemplate.queryForList("select * from department");
+    return maps.get(0);
+  }
 }

@@ -7,7 +7,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "define.hello")
 public class HelloProperties {
 
-    private String prefix;
-    private String suffix;
-
+  private String prefix;
+  private String suffix;
 }

@@ -4,11 +4,11 @@ spring:
     password: 123456
     url: jdbc:mysql://120.77.237.175:9306/springboot?serverTimezone=Asia/Shanghai
     driver-class-name: com.mysql.cj.jdbc.Driver
-    #schema-*.sql、data-*.sql
-    #默认规则：schema.sql，schema-all.sql；
-    #schema:
+      #schema-*.sql、data-*.sql
+      #默认规则：schema.sql，schema-all.sql；
+      #schema:
       #- classpath:sql/department.sql  #指定位置
-      #- classpath:sql/employee.sql
+    #- classpath:sql/employee.sql
     initialization-mode: always
 
     type: com.alibaba.druid.pool.DruidDataSource  #配置Druid连接池
@@ -41,9 +41,9 @@ spring:
         login-password: admin
         allow: 127.0.0.1
 
-#配置Mybatis规则
-#mybatis:
-  #configuration:
+    #配置Mybatis规则
+    #mybatis:
+    #configuration:
     #map-underscore-to-camel-case: true
 mybatis:
   config-location: classpath:/mybatis/mybatis.xml #指定全局配置文件的位置

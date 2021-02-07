@@ -21,6 +21,7 @@
       <list>
         <option value="HTML File" />
         <option value="spring-beans.schema" />
+        <option value="Interface" />
         <option value="Class" />
       </list>
     </option>
@@ -57,36 +58,101 @@
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="aspect.path.notification.shown" value="true" />
     <property name="jdk.selected.JAVA_MODULE" value="1.8" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/SpringBoot-thymeleaf/src/main/java/com/web/thymeleaf" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/SpringBoot-MybatisPlus/src/main/resources" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="project.structure.last.edited" value="模块" />
     <property name="project.structure.proportion" value="0.0" />
     <property name="project.structure.side.proportion" value="0.0" />
-    <property name="settings.editor.selected.configurable" value="spring.boot" />
+    <property name="settings.editor.selected.configurable" value="MavenSettings" />
   </component>
   <component name="RebelAgentSelection">
     <selection>jr</selection>
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\git\SpringBoot-Base\SpringBoot-MybatisPlus\src\main\resources" />
       <recent name="D:\git\SpringBoot-Base\SpringBoot-thymeleaf\src\main\java\com\web\thymeleaf" />
       <recent name="D:\git\SpringBoot-Base\SpringBoot-thymeleaf\src\main\resources\templates" />
       <recent name="D:\git\SpringBoot-Base\SpringBoot-thymeleaf\src\main\resources\static" />
     </key>
   </component>
-  <component name="RunManager" selected="Spring Boot.SpringbootDataMybatisApplication">
-    <configuration name="SpringbootDataJdbcApplicationTests.contextLoads" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
-      <module name="springboot-data-jdbc" />
+  <component name="RunManager" selected="JUnit.AssertionsTests.timeoutTest">
+    <configuration name="AssertionsTests.TestAllAssert" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="SpringBoot-Junit5" />
       <extension name="coverage">
         <pattern>
-          <option name="PATTERN" value="com.springboot.data.jdbc.springbootdatajdbc.*" />
+          <option name="PATTERN" value="com.sb.junit5.*" />
           <option name="ENABLED" value="true" />
         </pattern>
       </extension>
-      <option name="PACKAGE_NAME" value="com.springboot.data.jdbc.springbootdatajdbc" />
-      <option name="MAIN_CLASS_NAME" value="com.springboot.data.jdbc.springbootdatajdbc.SpringbootDataJdbcApplicationTests" />
-      <option name="METHOD_NAME" value="contextLoads" />
+      <option name="PACKAGE_NAME" value="com.sb.junit5" />
+      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
+      <option name="METHOD_NAME" value="TestAllAssert" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="AssertionsTests.shouldFail" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="SpringBoot-Junit5" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.sb.junit5.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.sb.junit5" />
+      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
+      <option name="METHOD_NAME" value="shouldFail" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="AssertionsTests.testArrayAssert" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="SpringBoot-Junit5" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.sb.junit5.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.sb.junit5" />
+      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
+      <option name="METHOD_NAME" value="testArrayAssert" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="AssertionsTests.testExceptionAssert" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="SpringBoot-Junit5" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.sb.junit5.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.sb.junit5" />
+      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
+      <option name="METHOD_NAME" value="testExceptionAssert" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="AssertionsTests.timeoutTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="SpringBoot-Junit5" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.sb.junit5.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.sb.junit5" />
+      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
+      <option name="METHOD_NAME" value="timeoutTest" />
       <option name="TEST_OBJECT" value="method" />
       <method v="2">
         <option name="Make" enabled="true" />
@@ -102,6 +168,20 @@
     <configuration name="HelloWorldMainApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
       <module name="SpringBoot-Helloworld" />
       <option name="SPRING_BOOT_MAIN_CLASS" value="Application.HelloWorldMainApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Junit5Application" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+      <module name="SpringBoot-Junit5" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.sb.junit5.Junit5Application" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="MybatisplusApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+      <module name="SpringBoot-MybatisPlus" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.sb.mybatisplus.MybatisplusApplication" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
@@ -199,7 +279,11 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="JUnit.SpringbootDataJdbcApplicationTests.contextLoads" />
+        <item itemvalue="JUnit.AssertionsTests.timeoutTest" />
+        <item itemvalue="JUnit.AssertionsTests.shouldFail" />
+        <item itemvalue="JUnit.AssertionsTests.testExceptionAssert" />
+        <item itemvalue="JUnit.AssertionsTests.TestAllAssert" />
+        <item itemvalue="JUnit.AssertionsTests.testArrayAssert" />
       </list>
     </recent_temporary>
   </component>
@@ -244,6 +328,15 @@
       <workItem from="1611192193454" duration="5519000" />
       <workItem from="1611207776261" duration="14315000" />
       <workItem from="1611540941340" duration="9909000" />
+      <workItem from="1612318297611" duration="636000" />
+      <workItem from="1612341145647" duration="681000" />
+      <workItem from="1612344423211" duration="2753000" />
+      <workItem from="1612405013946" duration="2355000" />
+      <workItem from="1612409289586" duration="10375000" />
+      <workItem from="1612492285238" duration="923000" />
+      <workItem from="1612510437643" duration="2052000" />
+      <workItem from="1612514525298" duration="4835000" />
+      <workItem from="1612579436852" duration="6671000" />
     </task>
     <servers />
   </component>
@@ -259,10 +352,14 @@
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="777" y="227" key="#HTTP代理/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1609212159218" />
-    <state x="765" y="235" width="747" height="594" key="#com.intellij.ide.util.MemberChooser" timestamp="1611221696192">
+    <state x="92" y="92" width="1736" height="856" key="#com.intellij.execution.junit2.states.ComparisonFailureState$DiffDialog" timestamp="1612576150933">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="765" y="235" width="747" height="594" key="#com.intellij.ide.util.MemberChooser/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611221696192" />
+    <state x="92" y="92" width="1736" height="856" key="#com.intellij.execution.junit2.states.ComparisonFailureState$DiffDialog/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612576150933" />
+    <state x="765" y="235" width="747" height="594" key="#com.intellij.ide.util.MemberChooser" timestamp="1612410726828">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state x="765" y="235" width="747" height="594" key="#com.intellij.ide.util.MemberChooser/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612410726828" />
     <state x="779" y="129" width="412" height="782" key="#com.intellij.openapi.keymap.impl.ui.EditKeymapsDialog" timestamp="1609300112420">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
@@ -291,66 +388,66 @@
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="502" y="178" key="GrepConsoleSettings/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1609293814315" />
-    <state width="1877" height="376" key="GridCell.Tab.0.bottom" timestamp="1611558447149">
+    <state width="1877" height="242" key="GridCell.Tab.0.bottom" timestamp="1612599157233">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.0.bottom/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
-    <state width="1877" height="376" key="GridCell.Tab.0.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611558447149" />
-    <state width="1877" height="376" key="GridCell.Tab.0.center" timestamp="1611558447149">
+    <state width="1877" height="242" key="GridCell.Tab.0.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157233" />
+    <state width="1877" height="242" key="GridCell.Tab.0.center" timestamp="1612599157233">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.0.center/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
-    <state width="1877" height="376" key="GridCell.Tab.0.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611558447149" />
-    <state width="1877" height="376" key="GridCell.Tab.0.left" timestamp="1611558447149">
+    <state width="1877" height="242" key="GridCell.Tab.0.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157233" />
+    <state width="1877" height="242" key="GridCell.Tab.0.left" timestamp="1612599157233">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.0.left/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
-    <state width="1877" height="376" key="GridCell.Tab.0.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611558447149" />
-    <state width="1877" height="376" key="GridCell.Tab.0.right" timestamp="1611558447149">
+    <state width="1877" height="242" key="GridCell.Tab.0.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157233" />
+    <state width="1877" height="242" key="GridCell.Tab.0.right" timestamp="1612599157233">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.0.right/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
-    <state width="1877" height="376" key="GridCell.Tab.0.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611558447149" />
-    <state width="1877" height="376" key="GridCell.Tab.1.bottom" timestamp="1611558447149">
+    <state width="1877" height="242" key="GridCell.Tab.0.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157233" />
+    <state width="1877" height="33" key="GridCell.Tab.1.bottom" timestamp="1612599157226">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.1.bottom/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
-    <state width="1877" height="376" key="GridCell.Tab.1.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611558447149" />
-    <state width="1877" height="376" key="GridCell.Tab.1.center" timestamp="1611558447149">
+    <state width="1877" height="33" key="GridCell.Tab.1.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157226" />
+    <state width="1877" height="33" key="GridCell.Tab.1.center" timestamp="1612599157226">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.1.center/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039508" />
-    <state width="1877" height="376" key="GridCell.Tab.1.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611558447149" />
-    <state width="1877" height="376" key="GridCell.Tab.1.left" timestamp="1611558447148">
+    <state width="1877" height="33" key="GridCell.Tab.1.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157226" />
+    <state width="1877" height="33" key="GridCell.Tab.1.left" timestamp="1612599157226">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.1.left/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039508" />
-    <state width="1877" height="376" key="GridCell.Tab.1.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611558447148" />
-    <state width="1877" height="376" key="GridCell.Tab.1.right" timestamp="1611558447149">
+    <state width="1877" height="33" key="GridCell.Tab.1.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157226" />
+    <state width="1877" height="33" key="GridCell.Tab.1.right" timestamp="1612599157226">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.1.right/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039508" />
-    <state width="1877" height="376" key="GridCell.Tab.1.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611558447149" />
-    <state width="1877" height="34" key="GridCell.Tab.2.bottom" timestamp="1611227020615">
+    <state width="1877" height="33" key="GridCell.Tab.1.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157226" />
+    <state width="1877" height="33" key="GridCell.Tab.2.bottom" timestamp="1612580364501">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="34" key="GridCell.Tab.2.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020615" />
-    <state width="1877" height="34" key="GridCell.Tab.2.center" timestamp="1611227020615">
+    <state width="1877" height="33" key="GridCell.Tab.2.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612580364501" />
+    <state width="1877" height="33" key="GridCell.Tab.2.center" timestamp="1612580364501">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="34" key="GridCell.Tab.2.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020615" />
-    <state width="1877" height="34" key="GridCell.Tab.2.left" timestamp="1611227020615">
+    <state width="1877" height="33" key="GridCell.Tab.2.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612580364501" />
+    <state width="1877" height="33" key="GridCell.Tab.2.left" timestamp="1612580364501">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="34" key="GridCell.Tab.2.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020615" />
-    <state width="1877" height="34" key="GridCell.Tab.2.right" timestamp="1611227020615">
+    <state width="1877" height="33" key="GridCell.Tab.2.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612580364501" />
+    <state width="1877" height="33" key="GridCell.Tab.2.right" timestamp="1612580364501">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="34" key="GridCell.Tab.2.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611227020615" />
-    <state x="461" y="164" key="SettingsEditor" timestamp="1609384925318">
+    <state width="1877" height="33" key="GridCell.Tab.2.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612580364501" />
+    <state x="461" y="164" key="SettingsEditor" timestamp="1612594375684">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="461" y="164" key="SettingsEditor/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1609384925318" />
+    <state x="461" y="164" key="SettingsEditor/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612594375684" />
     <state x="261" y="161" width="1354" height="693" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2" timestamp="1610957331916">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
@@ -359,14 +456,14 @@
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="662" y="94" width="675" height="852" key="find.popup/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610006447473" />
-    <state x="289" y="102" key="new project wizard" timestamp="1610329251367">
+    <state x="319" y="118" key="new project wizard" timestamp="1612514601956">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="289" y="102" key="new project wizard/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1610329251367" />
-    <state x="561" y="326" width="672" height="678" key="search.everywhere.popup" timestamp="1611555558415">
+    <state x="319" y="118" key="new project wizard/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612514601956" />
+    <state x="561" y="326" width="672" height="678" key="search.everywhere.popup" timestamp="1612512048810">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="561" y="326" width="672" height="678" key="search.everywhere.popup/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1611555558415" />
+    <state x="561" y="326" width="672" height="678" key="search.everywhere.popup/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612512048810" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -448,7 +545,7 @@
         </line-breakpoint>
         <line-breakpoint type="java-line">
           <url>file://$PROJECT_DIR$/SpringBoot-thymeleaf/src/main/java/com/web/thymeleaf/controller/IndexController.java</url>
-          <line>74</line>
+          <line>75</line>
           <option name="timeStamp" value="60" />
         </line-breakpoint>
         <line-breakpoint type="java-line">
@@ -473,7 +570,7 @@
         </line-breakpoint>
         <line-breakpoint type="java-line">
           <url>file://$PROJECT_DIR$/SpringBoot-thymeleaf/src/main/java/com/web/thymeleaf/controller/IndexController.java</url>
-          <line>94</line>
+          <line>91</line>
           <option name="timeStamp" value="70" />
         </line-breakpoint>
         <line-breakpoint type="java-line">
