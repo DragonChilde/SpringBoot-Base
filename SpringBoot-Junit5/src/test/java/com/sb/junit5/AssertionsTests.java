@@ -1,10 +1,15 @@
 package com.sb.junit5;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.Duration;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -81,4 +86,34 @@ public class AssertionsTests {
         //如果测试方法时间超过1s将会异常
         assertTimeout(Duration.ofMillis(500),()->Thread.sleep(1000),"超时");
     }
+
+    @Test
+    @DisplayName("前置测试")
+    public void AssumptionsTest()
+    {
+        Assumptions.assumeTrue(false,"结果不是true");
+        System.out.println("111111111111");
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(ints = {1,2,3,4,5})
+    @DisplayName("参数化测试")
+    public void testParameterized(int i){
+        System.out.println(i);
+    }
+
+
+    @ParameterizedTest
+    @DisplayName("参数化测试")
+    @MethodSource("stringProvider")
+    public void testParameterized2(String string){
+        System.out.println(string);
+    }
+
+    static Stream<String> stringProvider()
+    {
+        return Stream.of("aaa","bbb","ccc");
+    }
+
 }

@@ -77,8 +77,8 @@
       <recent name="D:\git\SpringBoot-Base\SpringBoot-thymeleaf\src\main\resources\static" />
     </key>
   </component>
-  <component name="RunManager" selected="JUnit.AssertionsTests.timeoutTest">
-    <configuration name="AssertionsTests.TestAllAssert" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+  <component name="RunManager" selected="JUnit.AssertionsTests.testParameterized2">
+    <configuration name="AssertionsTests.testParameterized" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="SpringBoot-Junit5" />
       <extension name="coverage">
         <pattern>
@@ -88,13 +88,13 @@
       </extension>
       <option name="PACKAGE_NAME" value="com.sb.junit5" />
       <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
-      <option name="METHOD_NAME" value="TestAllAssert" />
+      <option name="METHOD_NAME" value="testParameterized(int)" />
       <option name="TEST_OBJECT" value="method" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
     </configuration>
-    <configuration name="AssertionsTests.shouldFail" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+    <configuration name="AssertionsTests.testParameterized2" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="SpringBoot-Junit5" />
       <extension name="coverage">
         <pattern>
@@ -104,13 +104,13 @@
       </extension>
       <option name="PACKAGE_NAME" value="com.sb.junit5" />
       <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
-      <option name="METHOD_NAME" value="shouldFail" />
+      <option name="METHOD_NAME" value="testParameterized2(java.lang.String)" />
       <option name="TEST_OBJECT" value="method" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
     </configuration>
-    <configuration name="AssertionsTests.testArrayAssert" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+    <configuration name="Junit5ApplicationTests.testDisplayName" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="SpringBoot-Junit5" />
       <extension name="coverage">
         <pattern>
@@ -119,14 +119,14 @@
         </pattern>
       </extension>
       <option name="PACKAGE_NAME" value="com.sb.junit5" />
-      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
-      <option name="METHOD_NAME" value="testArrayAssert" />
+      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.Junit5ApplicationTests" />
+      <option name="METHOD_NAME" value="testDisplayName" />
       <option name="TEST_OBJECT" value="method" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
     </configuration>
-    <configuration name="AssertionsTests.testExceptionAssert" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+    <configuration name="TestingAStackDemo$WhenNew.isEmpty" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="SpringBoot-Junit5" />
       <extension name="coverage">
         <pattern>
@@ -135,14 +135,14 @@
         </pattern>
       </extension>
       <option name="PACKAGE_NAME" value="com.sb.junit5" />
-      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
-      <option name="METHOD_NAME" value="testExceptionAssert" />
+      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.TestingAStackDemo$WhenNew" />
+      <option name="METHOD_NAME" value="isEmpty" />
       <option name="TEST_OBJECT" value="method" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
     </configuration>
-    <configuration name="AssertionsTests.timeoutTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+    <configuration name="TestingAStackDemo" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="SpringBoot-Junit5" />
       <extension name="coverage">
         <pattern>
@@ -151,9 +151,8 @@
         </pattern>
       </extension>
       <option name="PACKAGE_NAME" value="com.sb.junit5" />
-      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.AssertionsTests" />
-      <option name="METHOD_NAME" value="timeoutTest" />
-      <option name="TEST_OBJECT" value="method" />
+      <option name="MAIN_CLASS_NAME" value="com.sb.junit5.TestingAStackDemo" />
+      <option name="TEST_OBJECT" value="class" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
@@ -279,11 +278,11 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="JUnit.AssertionsTests.timeoutTest" />
-        <item itemvalue="JUnit.AssertionsTests.shouldFail" />
-        <item itemvalue="JUnit.AssertionsTests.testExceptionAssert" />
-        <item itemvalue="JUnit.AssertionsTests.TestAllAssert" />
-        <item itemvalue="JUnit.AssertionsTests.testArrayAssert" />
+        <item itemvalue="JUnit.AssertionsTests.testParameterized2" />
+        <item itemvalue="JUnit.AssertionsTests.testParameterized" />
+        <item itemvalue="JUnit.TestingAStackDemo" />
+        <item itemvalue="JUnit.Junit5ApplicationTests.testDisplayName" />
+        <item itemvalue="JUnit.TestingAStackDemo$WhenNew.isEmpty" />
       </list>
     </recent_temporary>
   </component>
@@ -337,6 +336,8 @@
       <workItem from="1612510437643" duration="2052000" />
       <workItem from="1612514525298" duration="4835000" />
       <workItem from="1612579436852" duration="6671000" />
+      <workItem from="1613958655090" duration="209000" />
+      <workItem from="1613974460265" duration="3861000" />
     </task>
     <servers />
   </component>
@@ -388,26 +389,26 @@
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="502" y="178" key="GrepConsoleSettings/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1609293814315" />
-    <state width="1877" height="242" key="GridCell.Tab.0.bottom" timestamp="1612599157233">
+    <state width="1877" height="162" key="GridCell.Tab.0.bottom" timestamp="1613978445255">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.0.bottom/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
-    <state width="1877" height="242" key="GridCell.Tab.0.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157233" />
-    <state width="1877" height="242" key="GridCell.Tab.0.center" timestamp="1612599157233">
+    <state width="1877" height="162" key="GridCell.Tab.0.bottom/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1613978445255" />
+    <state width="1877" height="162" key="GridCell.Tab.0.center" timestamp="1613978445255">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.0.center/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
-    <state width="1877" height="242" key="GridCell.Tab.0.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157233" />
-    <state width="1877" height="242" key="GridCell.Tab.0.left" timestamp="1612599157233">
+    <state width="1877" height="162" key="GridCell.Tab.0.center/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1613978445255" />
+    <state width="1877" height="162" key="GridCell.Tab.0.left" timestamp="1613978445255">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.0.left/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
-    <state width="1877" height="242" key="GridCell.Tab.0.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157233" />
-    <state width="1877" height="242" key="GridCell.Tab.0.right" timestamp="1612599157233">
+    <state width="1877" height="162" key="GridCell.Tab.0.left/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1613978445255" />
+    <state width="1877" height="162" key="GridCell.Tab.0.right" timestamp="1613978445255">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state width="1877" height="226" key="GridCell.Tab.0.right/0.0.1920.1040/-1920.84.1920.1040@-1920.84.1920.1040" timestamp="1611197039509" />
-    <state width="1877" height="242" key="GridCell.Tab.0.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1612599157233" />
+    <state width="1877" height="162" key="GridCell.Tab.0.right/0.0.1920.1040/-1920.84.1920.1040@0.0.1920.1040" timestamp="1613978445255" />
     <state width="1877" height="33" key="GridCell.Tab.1.bottom" timestamp="1612599157226">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
